@@ -3,27 +3,18 @@
 #include <utility>
 
 namespace rx::ast {
-namespace {
-
-void printIndent(std::ostream &out, std::size_t indent) {
-    for (std::size_t i = 0; i < indent; ++i) {
-        out << "  ";
-    }
-}
-
-} // namespace
 
 LiteralExpr::LiteralExpr(std::string value) : value(std::move(value)) {}
 
 void LiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    printIndent(out, indent);
+    detail::printIndent(out, indent);
     out << "Literal " << value << '\n';
 }
 
 NameExpr::NameExpr(std::string name) : name(std::move(name)) {}
 
 void NameExpr::print(std::ostream &out, std::size_t indent) const {
-    printIndent(out, indent);
+    detail::printIndent(out, indent);
     out << "Name " << name << '\n';
 }
 
@@ -31,10 +22,23 @@ BinaryExpr::BinaryExpr(std::string op, ExprPtr left, ExprPtr right)
     : op(std::move(op)), left(std::move(left)), right(std::move(right)) {}
 
 void BinaryExpr::print(std::ostream &out, std::size_t indent) const {
-    printIndent(out, indent);
+    detail::printIndent(out, indent);
     out << "Binary " << op << '\n';
     left->print(out, indent + 1);
     right->print(out, indent + 1);
+}
+
+void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "EmptyStmt\n";
+}
+
+void Crate::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Crate\n";
+    for (const auto &item : items_) {
+        item->print(out, indent + 1);
+    }
 }
 
 void Program::print(std::ostream &out) const {

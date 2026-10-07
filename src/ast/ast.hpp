@@ -42,28 +42,20 @@ inline void printIndent(std::ostream &out, std::size_t indent) {
 } // namespace detail
 
 class EmptyStmt final : public Stmt {
-  public:
-    void print(std::ostream &out, std::size_t indent = 0) const override {
-        detail::printIndent(out, indent);
-        out << "EmptyStmt\n";
-    }
+ public:
+   void print(std::ostream &out, std::size_t indent = 0) const override;
 };
 
 class Crate final : public ASTNode {
-  public:
-    void addItem(ItemPtr item) { items_.push_back(std::move(item)); }
+ public:
+   void addItem(ItemPtr item) { items_.push_back(std::move(item)); }
 
-    void print(std::ostream &out, std::size_t indent = 0) const override {
-        detail::printIndent(out, indent);
-        out << "Crate\n";
-        for (const auto &item : items_) {
-            item->print(out, indent + 1);
-        }
-    }
+   void print(std::ostream &out, std::size_t indent = 0) const override;
 
-  private:
-    std::vector<ItemPtr> items_;
+ private:
+   std::vector<ItemPtr> items_;
 };
+
 
 struct LiteralExpr final : Expr {
     explicit LiteralExpr(std::string value);
