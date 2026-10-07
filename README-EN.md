@@ -35,6 +35,39 @@ rustup target add riscv32im-unknown-none-elf
 
 IR tests also require **Clang 22**.
 
+## Build and run the C++ parser locally
+
+The grammar and generated class names remain `Lexer` and `Parser`; generate them with ANTLR's `-package rx` option to put them in the `rx` namespace and avoid confusion with the runtime's `antlr4::Lexer` and `antlr4::Parser`. Building requires CMake, a C++17 compiler, and the ANTLR 4.13.2 C++ runtime installed on the system.
+
+To regenerate the lexer and parser, obtain the ANTLR 4.13.2 complete jar (the ANTLR tool and runtime are separate dependencies), then run from the repository root:
+
+```sh
+curl -fL https://www.antlr.org/download/antlr-4.13.2-complete.jar -o /tmp/antlr-4.13.2-complete.jar
+java -jar /tmp/antlr-4.13.2-complete.jar -Dlanguage=Cpp -package rx -visitor -listener -Xexact-output-dir -o generated grammar/Lexer.g4
+java -jar /tmp/antlr-4.13.2-complete.jar -Dlanguage=Cpp -package rx -visitor -listener -Xexact-output-dir -lib generated -o generated grammar/Parser.g4
+```
+
+Then build the parser and parse an Rx source file. Before compilation, CMake automatically qualifies the generated `.cpp` definitions with `rx::` (ANTLR 4.13.2's `-package` option namespaces the headers but leaves these member definitions unqualified):
+
+```sh
+cmake -S . -B build/parser
+cmake --build build/parser --target rx-parse -j2
+./build/parser/rx-parse tests/official/parser/accept/0005_fn_item-7c27348778.rx
+```
+
+`rx-parse` prints the parse tree to stdout; without a filename, it reads from stdin. Syntax errors return exit code `1`; command-line or file errors return `2`. Ubuntu's packaged runtime may be older than the generated code; to use matching version 4.13.2, build and install the C++ runtime from ANTLR 4.13.2 source. The project then finds the system-installed CMake package and does not need an ANTLR source checkout.
+
+```sh
+curl -fL https://github.com/antlr/antlr4/archive/refs/tags/4.13.2.tar.gz -o /tmp/antlr4-4.13.2.tar.gz
+tar -xzf /tmp/antlr4-4.13.2.tar.gz -C /tmp
+cmake -S /tmp/antlr4-4.13.2/runtime/Cpp -B /tmp/antlr4-4.13.2-build \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DANTLR4_INSTALL=ON -DANTLR_BUILD_CPP_TESTS=OFF
+cmake --build /tmp/antlr4-4.13.2-build -j2
+sudo cmake --install /tmp/antlr4-4.13.2-build
+sudo ldconfig
+```
+
 ## Overview
 
 In this course you can use **any language** to implement your compiler. Contact the TA if your language is not mainstream so that we can provide support for it on the Online Judge. For this reason, the template we provide here is **language-agnostic**. You will find:

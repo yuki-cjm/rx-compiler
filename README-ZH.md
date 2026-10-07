@@ -35,6 +35,43 @@ rustup target add riscv32im-unknown-none-elf
 
 IR 测试还需要 **Clang 22**。
 
+## 本地构建并运行 C++ Parser
+
+文法和生成类名仍为 `Lexer`、`Parser`；生成时通过 ANTLR 的 `-package rx` 将它们放进 `rx` 命名空间，避免与 runtime 的 `antlr4::Lexer`、`antlr4::Parser` 混淆。构建需要 CMake、C++17 编译器，以及安装在系统中的 ANTLR C++ runtime 4.13.2。
+
+若要重新生成 lexer 和 parser，需要 ANTLR 4.13.2 的 complete jar（ANTLR 工具与 runtime 是两个独立依赖）。从项目根目录运行：
+
+```sh
+curl -fL https://www.antlr.org/download/antlr-4.13.2-complete.jar -o /tmp/antlr-4.13.2-complete.jar
+java -jar /tmp/antlr-4.13.2-complete.jar -Dlanguage=Cpp -package rx -visitor -listener -Xexact-output-dir -o generated grammar/Lexer.g4
+java -jar /tmp/antlr-4.13.2-complete.jar -Dlanguage=Cpp -package rx -visitor -listener -Xexact-output-dir -lib generated -o generated grammar/Parser.g4
+```
+
+然后构建并解析一个 Rx 文件。CMake 会在编译前自动为 ANTLR 4.13.2 生成的 `.cpp` 定义补上 `rx::` 限定（ANTLR 4.13.2 的 `-package` 已给头文件加命名空间，但没有限定 `.cpp` 中同名的成员定义）：
+
+```sh
+cmake -S . -B build/parser
+cmake --build build/parser --target rx-parse -j2
+./build/parser/rx-parse tests/official/parser/accept/0005_fn_item-7c27348778.rx
+```
+
+`rx-parse` 将 parse tree 打印到标准输出；不带文件参数时从标准输入读取。语法错误返回退出码 `1`，命令行参数或文件错误返回 `2`。
+
+Ubuntu 仓库的 runtime 版本可能低于生成器版本。需要安装匹配的 4.13.2 时，可下载官方源码包，在 `/tmp` 中构建并安装 C++ runtime：
+
+```sh
+curl -fL https://github.com/antlr/antlr4/archive/refs/tags/4.13.2.tar.gz -o /tmp/antlr4-4.13.2.tar.gz
+tar -xzf /tmp/antlr4-4.13.2.tar.gz -C /tmp
+cmake -S /tmp/antlr4-4.13.2/runtime/Cpp -B /tmp/antlr4-4.13.2-build \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DANTLR4_INSTALL=ON -DANTLR_BUILD_CPP_TESTS=OFF
+cmake --build /tmp/antlr4-4.13.2-build -j2
+sudo cmake --install /tmp/antlr4-4.13.2-build
+sudo ldconfig
+```
+
+项目会通过系统安装的 CMake package 查找 runtime，不需要把 ANTLR 源码仓库放在项目中。
+
 ## 概述
 
 在本门课程中，你可以使用**任意语言**来实现你的编译器。如果你的实现语言较为冷门，请联系助教以便我们在 Online Judge（评测机）上提供支持。因此，我们在此提供的模板是**与实现语言无关的（language-agnostic）**。仓库中包含：

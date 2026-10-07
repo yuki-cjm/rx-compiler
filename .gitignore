@@ -1,5 +1,6 @@
 # Rust
 /target
+/build
 
 # REIMU build configuration
 /.xmake/
@@ -13,3 +14,6 @@ __pycache__/
 # Local files
 dev/
 *.local.*
+
+# VSCode
+.vscode/
