@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(rx_compiler LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_package(antlr4-runtime 4.13.2 EXACT CONFIG REQUIRED)
 
@@ -10,6 +12,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(rx-parse
     src/main.cpp
+    src/ast/ast.cpp
+    src/ast/ast_builder.cpp
     generated/Lexer.cpp
     generated/Parser.cpp
     generated/ParserBaseListener.cpp

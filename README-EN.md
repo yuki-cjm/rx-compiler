@@ -68,6 +68,14 @@ sudo cmake --install /tmp/antlr4-4.13.2-build
 sudo ldconfig
 ```
 
+Use `--ast` to lower the parse tree into the subset of AST nodes currently implemented:
+
+```sh
+./build/system-parser/rx-parse --ast path/to/program.rx
+```
+
+The sample currently supports functions, named parameters, `let`, literals/paths, and addition/subtraction. It reports an explicit error for syntax not yet lowered. Without `--ast`, the program continues to print the ANTLR parse tree.
+
 ## Overview
 
 In this course you can use **any language** to implement your compiler. Contact the TA if your language is not mainstream so that we can provide support for it on the Online Judge. For this reason, the template we provide here is **language-agnostic**. You will find:

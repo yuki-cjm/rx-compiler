@@ -72,6 +72,14 @@ sudo ldconfig
 
 项目会通过系统安装的 CMake package 查找 runtime，不需要把 ANTLR 源码仓库放在项目中。
 
+使用 `--ast` 可将 parse tree lowering 成当前示例支持的 AST：
+
+```sh
+./build/system-parser/rx-parse --ast path/to/program.rx
+```
+
+该样例目前只支持函数、具名参数、`let`、字面量/路径，以及加减法表达式；遇到尚未实现的语法会明确报错。默认不带 `--ast` 时仍打印 ANTLR parse tree。
+
 ## 概述
 
 在本门课程中，你可以使用**任意语言**来实现你的编译器。如果你的实现语言较为冷门，请联系助教以便我们在 Online Judge（评测机）上提供支持。因此，我们在此提供的模板是**与实现语言无关的（language-agnostic）**。仓库中包含：

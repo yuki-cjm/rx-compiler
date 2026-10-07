@@ -17,3 +17,6 @@ dev/
 
 # VSCode
 .vscode/
+
+# Cache
+.cache/
