@@ -47,7 +47,8 @@ void Program::print(std::ostream &out) const {
         out << '\n';
 
         for (const auto &parameter : function.parameters) {
-            out << "    Parameter " << parameter.name << ": " << parameter.type << '\n';
+            out << "    Parameter " << parameter.name << ": " << parameter.type
+                << '\n';
         }
 
         out << "    Block\n";

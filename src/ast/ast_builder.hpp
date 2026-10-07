@@ -1,15 +1,15 @@
 #pragma once
 
-#include "ast.hpp"
 #include "Parser.h"
+#include "ast.hpp"
 
 namespace rx::ast {
 
 class AstBuilder {
-public:
+  public:
     Program build(Parser::CrateContext *crate) const;
 
-private:
+  private:
     Function buildFunction(Parser::FunctionDefinitionContext *context) const;
     Block buildBlock(Parser::BlockExpressionContext *context) const;
     LetStatement buildLet(Parser::LetStatementContext *context) const;
