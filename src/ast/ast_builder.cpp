@@ -89,7 +89,36 @@ LetStatement AstBuilder::buildLet(Parser::LetStatementContext *context) const {
 
 ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RuleLiteralExpression) {
-        return std::make_unique<LiteralExpr>(context->getText());
+        auto *literal =
+            dynamic_cast<Parser::LiteralExpressionContext *>(context);
+        if (literal->INTEGER_LITERAL() != nullptr) {
+            return std::make_unique<IntegerLiteralExpr>(
+                literal->INTEGER_LITERAL()->getText());
+        }
+        return std::make_unique<BooleanLiteralExpr>(literal->TRUE() != nullptr);
+    }
+
+    if (context->getRuleIndex() == Parser::RuleNonBlockPrimary ||
+        context->getRuleIndex() == Parser::RuleConditionPrimaryWithoutBareBlock) {
+        auto *primary =
+            dynamic_cast<Parser::NonBlockPrimaryContext *>(context);
+        if (primary != nullptr && primary->LPAREN() != nullptr) {
+            if (primary->expression() == nullptr) {
+                return std::make_unique<UnitExpr>();
+            }
+            return buildExpression(primary->expression());
+        }
+
+        auto *conditionPrimary =
+            dynamic_cast<Parser::ConditionPrimaryWithoutBareBlockContext *>(
+                context);
+        if (conditionPrimary != nullptr &&
+            conditionPrimary->LPAREN() != nullptr) {
+            if (conditionPrimary->expression() == nullptr) {
+                return std::make_unique<UnitExpr>();
+            }
+            return buildExpression(conditionPrimary->expression());
+        }
     }
 
     if (context->getRuleIndex() == Parser::RulePathInExpression) {

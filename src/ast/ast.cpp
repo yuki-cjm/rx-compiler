@@ -11,6 +11,26 @@ void LiteralExpr::print(std::ostream &out, std::size_t indent) const {
     out << "Literal " << value << '\n';
 }
 
+IntegerLiteralExpr::IntegerLiteralExpr(std::string value)
+    : value(std::move(value)) {}
+
+void IntegerLiteralExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "IntegerLiteral " << value << '\n';
+}
+
+BooleanLiteralExpr::BooleanLiteralExpr(bool value) : value(value) {}
+
+void BooleanLiteralExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "BooleanLiteral " << (value ? "true" : "false") << '\n';
+}
+
+void UnitExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Unit\n";
+}
+
 NameExpr::NameExpr(std::string name) : name(std::move(name)) {}
 
 void NameExpr::print(std::ostream &out, std::size_t indent) const {

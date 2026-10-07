@@ -64,6 +64,24 @@ struct LiteralExpr final : Expr {
     std::string value;
 };
 
+struct IntegerLiteralExpr final : Expr {
+    explicit IntegerLiteralExpr(std::string value);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::string value;
+};
+
+struct BooleanLiteralExpr final : Expr {
+    explicit BooleanLiteralExpr(bool value);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    bool value;
+};
+
+struct UnitExpr final : Expr {
+    void print(std::ostream &out, std::size_t indent) const override;
+};
+
 struct NameExpr final : Expr {
     explicit NameExpr(std::string name);
     void print(std::ostream &out, std::size_t indent) const override;
