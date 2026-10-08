@@ -222,6 +222,15 @@ struct BlockExpr final : Expr {
     ExprPtr tail;
 };
 
+struct IfExpr final : Expr {
+    IfExpr(ExprPtr condition, BlockExpr thenBranch, ExprPtr elseBranch);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr condition;
+    BlockExpr thenBranch;
+    ExprPtr elseBranch;
+};
+
 struct Function {
     std::string name;
     std::vector<Parameter> parameters;

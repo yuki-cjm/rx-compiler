@@ -184,12 +184,18 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             dynamic_cast<Parser::StatementPostfixExpressionContext *>(context);
         if (postfix->expressionWithBlock() != nullptr) {
             auto *expressionWithBlock = postfix->expressionWithBlock();
-            if (expressionWithBlock->blockExpression() == nullptr ||
-                postfix->dotSuffix() == nullptr) {
+            if (postfix->dotSuffix() == nullptr) {
                 unsupported(expressionWithBlock);
             }
-            ExprPtr result =
-                buildExpression(expressionWithBlock->blockExpression());
+            ExprPtr result;
+            if (expressionWithBlock->blockExpression() != nullptr) {
+                result =
+                    buildExpression(expressionWithBlock->blockExpression());
+            } else if (expressionWithBlock->ifExpression() != nullptr) {
+                result = buildExpression(expressionWithBlock->ifExpression());
+            } else {
+                unsupported(expressionWithBlock);
+            }
             result = applyDotSuffix(std::move(result), postfix->dotSuffix());
             return applyPostfixSuffixes(std::move(result),
                                         postfix->postfixSuffix());
@@ -201,11 +207,14 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RulePrimaryExpression) {
         auto *primary = dynamic_cast<Parser::PrimaryExpressionContext *>(context);
         if (primary->expressionWithBlock() != nullptr) {
-            if (primary->expressionWithBlock()->blockExpression() == nullptr) {
-                unsupported(primary->expressionWithBlock());
+            auto *expressionWithBlock = primary->expressionWithBlock();
+            if (expressionWithBlock->blockExpression() != nullptr) {
+                return buildExpression(expressionWithBlock->blockExpression());
             }
-            return buildExpression(
-                primary->expressionWithBlock()->blockExpression());
+            if (expressionWithBlock->ifExpression() != nullptr) {
+                return buildExpression(expressionWithBlock->ifExpression());
+            }
+            unsupported(expressionWithBlock);
         }
         return buildExpression(primary->nonBlockPrimary());
     }
@@ -381,6 +390,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
              conditionPrimary->BREAK() != nullptr ||
              conditionPrimary->RETURN() != nullptr ||
              conditionPrimary->CONTINUE() != nullptr)) {
+            if (conditionPrimary->ifExpression() != nullptr) {
+                return buildExpression(conditionPrimary->ifExpression());
+            }
             unsupported(context);
         }
     }
@@ -1165,6 +1177,33 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         }
         return std::make_unique<ArrayExpr>(std::move(elements),
                                            std::move(repeatCount));
+    }
+
+    if (context->getRuleIndex() == Parser::RuleIfExpression) {
+        auto *ifContext = dynamic_cast<Parser::IfExpressionContext *>(context);
+        const auto blocks = ifContext->blockExpression();
+        if (ifContext->conditionExpression() == nullptr || blocks.empty() ||
+            blocks.size() > 2) {
+            unsupported(context);
+        }
+
+        ExprPtr condition = buildExpression(ifContext->conditionExpression());
+        BlockExpr thenBranch = buildBlock(blocks[0]);
+        ExprPtr elseBranch;
+        if (ifContext->ifExpression() != nullptr) {
+            if (blocks.size() != 1) {
+                unsupported(context);
+            }
+            elseBranch = buildExpression(ifContext->ifExpression());
+        } else if (blocks.size() == 2) {
+            elseBranch = buildExpression(blocks[1]);
+        } else if (ifContext->ELSE() != nullptr) {
+            unsupported(context);
+        }
+
+        return std::make_unique<IfExpr>(std::move(condition),
+                                        std::move(thenBranch),
+                                        std::move(elseBranch));
     }
 
     const auto children = ruleChildren(context);

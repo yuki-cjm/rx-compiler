@@ -359,6 +359,22 @@ void BlockExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+IfExpr::IfExpr(ExprPtr condition, BlockExpr thenBranch, ExprPtr elseBranch)
+    : condition(std::move(condition)), thenBranch(std::move(thenBranch)),
+      elseBranch(std::move(elseBranch)) {}
+
+void IfExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "If\n";
+    condition->print(out, indent + 1);
+    thenBranch.print(out, indent + 2);
+    if (elseBranch) {
+        detail::printIndent(out, indent + 1);
+        out << "Else\n";
+        elseBranch->print(out, indent + 2);
+    }
+}
+
 void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "EmptyStmt\n";
