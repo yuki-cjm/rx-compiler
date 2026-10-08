@@ -719,6 +719,55 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return result;
     }
 
+    if (ruleIndex == Parser::RuleLogicalOrExpression ||
+        ruleIndex == Parser::RuleStatementLogicalOrExpression) {
+        std::vector<antlr4::ParserRuleContext *> operands;
+        bool pendingOr = false;
+
+        for (auto *child : context->children) {
+            if (auto *terminal =
+                    dynamic_cast<antlr4::tree::TerminalNode *>(child)) {
+                if (terminal->getSymbol()->getType() != Parser::OROR ||
+                    operands.empty() || pendingOr) {
+                    unsupported(context);
+                }
+                pendingOr = true;
+                continue;
+            }
+
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            const auto childRuleIndex = rule->getRuleIndex();
+            if (childRuleIndex == Parser::RuleLogicalAndExpression ||
+                childRuleIndex == Parser::RuleStatementLogicalAndExpression) {
+                if (!operands.empty() && !pendingOr) {
+                    unsupported(context);
+                }
+                operands.push_back(rule);
+                pendingOr = false;
+            }
+        }
+
+        if (operands.empty() || pendingOr) {
+            unsupported(context);
+        }
+
+        if (operands.size() == 1) {
+            return buildExpression(operands.front());
+        }
+
+        ExprPtr result = buildExpression(operands.front());
+        for (std::size_t i = 1; i < operands.size(); ++i) {
+            result = std::make_unique<BinaryExpr>(
+                BinaryOp::LogicalOr, std::move(result),
+                buildExpression(operands[i]));
+        }
+        return result;
+    }
+
     const auto children = ruleChildren(context);
     if (children.size() == 1) {
         return buildExpression(children.front());
