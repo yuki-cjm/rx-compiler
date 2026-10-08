@@ -5,6 +5,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -96,28 +97,66 @@ struct PathExpr final : Expr {
     std::vector<std::string> segments;
 };
 
+enum class UnaryOp {
+    Negate,
+    LogicalNot,
+    Dereference,
+    Borrow,
+    BorrowMut,
+    DoubleBorrow,
+    DoubleBorrowMut,
+};
+
+enum class BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+    ShiftLeft,
+    ShiftRight,
+    BitwiseAnd,
+    BitwiseXor,
+    BitwiseOr,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    Equal,
+    NotEqual,
+    LogicalAnd,
+    LogicalOr,
+    Assign,
+    AddAssign,
+    SubtractAssign,
+    MultiplyAssign,
+    DivideAssign,
+    RemainderAssign,
+    BitwiseAndAssign,
+    BitwiseXorAssign,
+    BitwiseOrAssign,
+    ShiftLeftAssign,
+    ShiftRightAssign,
+};
+
+std::string_view unaryOpText(UnaryOp op);
+UnaryOp unaryOpFromText(std::string_view text);
+std::string_view binaryOpText(BinaryOp op);
+BinaryOp binaryOpFromText(std::string_view text);
+
 struct UnaryExpr final : Expr {
-    UnaryExpr(std::string op, ExprPtr operand);
+    UnaryExpr(UnaryOp op, ExprPtr operand);
     void print(std::ostream &out, std::size_t indent) const override;
 
-    std::string op;
+    UnaryOp op;
     ExprPtr operand;
 };
 
 struct BinaryExpr final : Expr {
-    BinaryExpr(std::string op, ExprPtr left, ExprPtr right);
+    BinaryExpr(BinaryOp op, ExprPtr left, ExprPtr right);
     void print(std::ostream &out, std::size_t indent) const override;
 
-    std::string op;
-    ExprPtr left;
-    ExprPtr right;
-};
-
-struct ComparisonExpr final : Expr {
-    ComparisonExpr(std::string op, ExprPtr left, ExprPtr right);
-    void print(std::ostream &out, std::size_t indent) const override;
-
-    std::string op;
+    BinaryOp op;
     ExprPtr left;
     ExprPtr right;
 };

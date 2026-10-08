@@ -1,5 +1,6 @@
 #include "ast.hpp"
 
+#include <stdexcept>
 #include <utility>
 
 namespace rx::ast {
@@ -50,31 +51,228 @@ void PathExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
-UnaryExpr::UnaryExpr(std::string op, ExprPtr operand)
-    : op(std::move(op)), operand(std::move(operand)) {}
+namespace {
+
+[[noreturn]] void invalidOperator() { throw std::logic_error("invalid AST operator"); }
+
+} // namespace
+
+std::string_view unaryOpText(UnaryOp op) {
+    switch (op) {
+    case UnaryOp::Negate:
+        return "-";
+    case UnaryOp::LogicalNot:
+        return "!";
+    case UnaryOp::Dereference:
+        return "*";
+    case UnaryOp::Borrow:
+        return "&";
+    case UnaryOp::BorrowMut:
+        return "&mut";
+    case UnaryOp::DoubleBorrow:
+        return "&&";
+    case UnaryOp::DoubleBorrowMut:
+        return "&&mut";
+    }
+    invalidOperator();
+}
+
+UnaryOp unaryOpFromText(std::string_view text) {
+    if (text == "-") {
+        return UnaryOp::Negate;
+    }
+    if (text == "!") {
+        return UnaryOp::LogicalNot;
+    }
+    if (text == "*") {
+        return UnaryOp::Dereference;
+    }
+    if (text == "&") {
+        return UnaryOp::Borrow;
+    }
+    if (text == "&mut") {
+        return UnaryOp::BorrowMut;
+    }
+    if (text == "&&") {
+        return UnaryOp::DoubleBorrow;
+    }
+    if (text == "&&mut") {
+        return UnaryOp::DoubleBorrowMut;
+    }
+    throw std::invalid_argument("unknown unary operator: " + std::string(text));
+}
+
+std::string_view binaryOpText(BinaryOp op) {
+    switch (op) {
+    case BinaryOp::Add:
+        return "+";
+    case BinaryOp::Subtract:
+        return "-";
+    case BinaryOp::Multiply:
+        return "*";
+    case BinaryOp::Divide:
+        return "/";
+    case BinaryOp::Remainder:
+        return "%";
+    case BinaryOp::ShiftLeft:
+        return "<<";
+    case BinaryOp::ShiftRight:
+        return ">>";
+    case BinaryOp::BitwiseAnd:
+        return "&";
+    case BinaryOp::BitwiseXor:
+        return "^";
+    case BinaryOp::BitwiseOr:
+        return "|";
+    case BinaryOp::Less:
+        return "<";
+    case BinaryOp::LessEqual:
+        return "<=";
+    case BinaryOp::Greater:
+        return ">";
+    case BinaryOp::GreaterEqual:
+        return ">=";
+    case BinaryOp::Equal:
+        return "==";
+    case BinaryOp::NotEqual:
+        return "!=";
+    case BinaryOp::LogicalAnd:
+        return "&&";
+    case BinaryOp::LogicalOr:
+        return "||";
+    case BinaryOp::Assign:
+        return "=";
+    case BinaryOp::AddAssign:
+        return "+=";
+    case BinaryOp::SubtractAssign:
+        return "-=";
+    case BinaryOp::MultiplyAssign:
+        return "*=";
+    case BinaryOp::DivideAssign:
+        return "/=";
+    case BinaryOp::RemainderAssign:
+        return "%=";
+    case BinaryOp::BitwiseAndAssign:
+        return "&=";
+    case BinaryOp::BitwiseXorAssign:
+        return "^=";
+    case BinaryOp::BitwiseOrAssign:
+        return "|=";
+    case BinaryOp::ShiftLeftAssign:
+        return "<<=";
+    case BinaryOp::ShiftRightAssign:
+        return ">>=";
+    }
+    invalidOperator();
+}
+
+BinaryOp binaryOpFromText(std::string_view text) {
+    if (text == "+") {
+        return BinaryOp::Add;
+    }
+    if (text == "-") {
+        return BinaryOp::Subtract;
+    }
+    if (text == "*") {
+        return BinaryOp::Multiply;
+    }
+    if (text == "/") {
+        return BinaryOp::Divide;
+    }
+    if (text == "%") {
+        return BinaryOp::Remainder;
+    }
+    if (text == "<<") {
+        return BinaryOp::ShiftLeft;
+    }
+    if (text == ">>") {
+        return BinaryOp::ShiftRight;
+    }
+    if (text == "&") {
+        return BinaryOp::BitwiseAnd;
+    }
+    if (text == "^") {
+        return BinaryOp::BitwiseXor;
+    }
+    if (text == "|") {
+        return BinaryOp::BitwiseOr;
+    }
+    if (text == "<") {
+        return BinaryOp::Less;
+    }
+    if (text == "<=") {
+        return BinaryOp::LessEqual;
+    }
+    if (text == ">") {
+        return BinaryOp::Greater;
+    }
+    if (text == ">=") {
+        return BinaryOp::GreaterEqual;
+    }
+    if (text == "==") {
+        return BinaryOp::Equal;
+    }
+    if (text == "!=") {
+        return BinaryOp::NotEqual;
+    }
+    if (text == "&&") {
+        return BinaryOp::LogicalAnd;
+    }
+    if (text == "||") {
+        return BinaryOp::LogicalOr;
+    }
+    if (text == "=") {
+        return BinaryOp::Assign;
+    }
+    if (text == "+=") {
+        return BinaryOp::AddAssign;
+    }
+    if (text == "-=") {
+        return BinaryOp::SubtractAssign;
+    }
+    if (text == "*=") {
+        return BinaryOp::MultiplyAssign;
+    }
+    if (text == "/=") {
+        return BinaryOp::DivideAssign;
+    }
+    if (text == "%=") {
+        return BinaryOp::RemainderAssign;
+    }
+    if (text == "&=") {
+        return BinaryOp::BitwiseAndAssign;
+    }
+    if (text == "^=") {
+        return BinaryOp::BitwiseXorAssign;
+    }
+    if (text == "|=") {
+        return BinaryOp::BitwiseOrAssign;
+    }
+    if (text == "<<=") {
+        return BinaryOp::ShiftLeftAssign;
+    }
+    if (text == ">>=") {
+        return BinaryOp::ShiftRightAssign;
+    }
+    throw std::invalid_argument("unknown binary operator: " +
+                                std::string(text));
+}
+
+UnaryExpr::UnaryExpr(UnaryOp op, ExprPtr operand)
+    : op(op), operand(std::move(operand)) {}
 
 void UnaryExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Unary " << op << '\n';
+    out << "Unary " << unaryOpText(op) << '\n';
     operand->print(out, indent + 1);
 }
 
-BinaryExpr::BinaryExpr(std::string op, ExprPtr left, ExprPtr right)
-    : op(std::move(op)), left(std::move(left)), right(std::move(right)) {}
+BinaryExpr::BinaryExpr(BinaryOp op, ExprPtr left, ExprPtr right)
+    : op(op), left(std::move(left)), right(std::move(right)) {}
 
 void BinaryExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Binary " << op << '\n';
-    left->print(out, indent + 1);
-    right->print(out, indent + 1);
-}
-
-ComparisonExpr::ComparisonExpr(std::string op, ExprPtr left, ExprPtr right)
-    : op(std::move(op)), left(std::move(left)), right(std::move(right)) {}
-
-void ComparisonExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Comparison " << op << '\n';
+    out << "Binary " << binaryOpText(op) << '\n';
     left->print(out, indent + 1);
     right->print(out, indent + 1);
 }
