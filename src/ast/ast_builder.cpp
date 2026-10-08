@@ -524,6 +524,104 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return result;
     }
 
+    if (context->getRuleIndex() == Parser::RuleBitXorExpression ||
+        context->getRuleIndex() == Parser::RuleClosedBitXorExpression ||
+        context->getRuleIndex() == Parser::RuleStatementBitXorExpression ||
+        context->getRuleIndex() ==
+            Parser::RuleStatementClosedBitXorExpression) {
+        ExprPtr result;
+        bool pendingXor = false;
+
+        for (auto *child : context->children) {
+            if (auto *terminal =
+                    dynamic_cast<antlr4::tree::TerminalNode *>(child)) {
+                if (terminal->getSymbol()->getType() != Parser::CARET ||
+                    !result || pendingXor) {
+                    unsupported(context);
+                }
+                pendingXor = true;
+                continue;
+            }
+
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleBitAndExpression ||
+                ruleIndex == Parser::RuleClosedBitAndExpression ||
+                ruleIndex == Parser::RuleStatementBitAndExpression ||
+                ruleIndex == Parser::RuleStatementClosedBitAndExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (!pendingXor) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        "^", std::move(result), std::move(operand));
+                    pendingXor = false;
+                }
+            }
+        }
+
+        if (!result || pendingXor) {
+            unsupported(context);
+        }
+        return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleBitOrExpression ||
+        context->getRuleIndex() == Parser::RuleClosedBitOrExpression ||
+        context->getRuleIndex() == Parser::RuleStatementBitOrExpression ||
+        context->getRuleIndex() ==
+            Parser::RuleStatementClosedBitOrExpression) {
+        ExprPtr result;
+        bool pendingOr = false;
+
+        for (auto *child : context->children) {
+            if (auto *terminal =
+                    dynamic_cast<antlr4::tree::TerminalNode *>(child)) {
+                if (terminal->getSymbol()->getType() != Parser::PIPE ||
+                    !result || pendingOr) {
+                    unsupported(context);
+                }
+                pendingOr = true;
+                continue;
+            }
+
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleBitXorExpression ||
+                ruleIndex == Parser::RuleClosedBitXorExpression ||
+                ruleIndex == Parser::RuleStatementBitXorExpression ||
+                ruleIndex == Parser::RuleStatementClosedBitXorExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (!pendingOr) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        "|", std::move(result), std::move(operand));
+                    pendingOr = false;
+                }
+            }
+        }
+
+        if (!result || pendingOr) {
+            unsupported(context);
+        }
+        return result;
+    }
+
     const auto children = ruleChildren(context);
     if (children.size() == 1) {
         return buildExpression(children.front());
