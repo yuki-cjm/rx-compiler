@@ -670,6 +670,55 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         }
     }
 
+    const auto ruleIndex = context->getRuleIndex();
+    if (ruleIndex == Parser::RuleLogicalAndExpression ||
+        ruleIndex == Parser::RuleStatementLogicalAndExpression) {
+        std::vector<antlr4::ParserRuleContext *> operands;
+        bool pendingAnd = false;
+
+        for (auto *child : context->children) {
+            if (auto *terminal =
+                    dynamic_cast<antlr4::tree::TerminalNode *>(child)) {
+                if (terminal->getSymbol()->getType() != Parser::ANDAND ||
+                    operands.empty() || pendingAnd) {
+                    unsupported(context);
+                }
+                pendingAnd = true;
+                continue;
+            }
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            const auto childRuleIndex = rule->getRuleIndex();
+            if (childRuleIndex == Parser::RuleComparisonExpression ||
+                childRuleIndex == Parser::RuleStatementComparisonExpression) {
+                if (!operands.empty() && !pendingAnd) {
+                    unsupported(context);
+                }
+                operands.push_back(rule);
+                pendingAnd = false;
+            }
+        }
+
+        if (operands.empty() || pendingAnd) {
+            unsupported(context);
+        }
+
+        if (operands.size() == 1) {
+            return buildExpression(operands.front());
+        }
+
+        ExprPtr result = buildExpression(operands.front());
+        for (std::size_t i = 1; i < operands.size(); ++i) {
+            result = std::make_unique<BinaryExpr>(
+                BinaryOp::LogicalAnd, std::move(result),
+                buildExpression(operands[i]));
+        }
+        return result;
+    }
+
     const auto children = ruleChildren(context);
     if (children.size() == 1) {
         return buildExpression(children.front());
