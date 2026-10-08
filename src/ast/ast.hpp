@@ -193,6 +193,15 @@ struct BinaryExpr final : Expr {
     ExprPtr right;
 };
 
+struct ArrayExpr final : Expr {
+    ArrayExpr(std::vector<ExprPtr> elements,
+              std::optional<std::string> repeatCount = std::nullopt);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::vector<ExprPtr> elements;
+    std::optional<std::string> repeatCount;
+};
+
 struct Parameter {
     std::string name;
     std::string type;

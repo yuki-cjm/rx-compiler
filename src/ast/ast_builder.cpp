@@ -339,8 +339,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             return buildExpression(primary->expression());
         }
         if (primary != nullptr &&
-            (primary->arrayExpression() != nullptr ||
-             primary->LBRACE() != nullptr || primary->BREAK() != nullptr ||
+            (primary->LBRACE() != nullptr || primary->BREAK() != nullptr ||
              primary->RETURN() != nullptr || primary->CONTINUE() != nullptr)) {
             unsupported(context);
         }
@@ -356,8 +355,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             return buildExpression(conditionPrimary->expression());
         }
         if (conditionPrimary != nullptr &&
-            (conditionPrimary->arrayExpression() != nullptr ||
-             conditionPrimary->ifExpression() != nullptr ||
+            (conditionPrimary->ifExpression() != nullptr ||
              conditionPrimary->LOOP() != nullptr ||
              conditionPrimary->WHILE() != nullptr ||
              conditionPrimary->BREAK() != nullptr ||
@@ -956,6 +954,24 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         } else {
             return buildExpression(assignment->statementLogicalOrExpression());
         }
+    }
+
+    if (context->getRuleIndex() == Parser::RuleArrayExpression) {
+        auto *array = dynamic_cast<Parser::ArrayExpressionContext *>(context);
+        std::vector<ExprPtr> elements;
+        for (auto *element : array->expression()) {
+            elements.push_back(buildExpression(element));
+        }
+
+        std::optional<std::string> repeatCount;
+        if (array->SEMI() != nullptr) {
+            if (array->constValue() == nullptr || elements.size() != 1) {
+                unsupported(context);
+            }
+            repeatCount = array->constValue()->getText();
+        }
+        return std::make_unique<ArrayExpr>(std::move(elements),
+                                           std::move(repeatCount));
     }
 
     const auto children = ruleChildren(context);

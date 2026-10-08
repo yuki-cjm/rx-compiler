@@ -88,7 +88,7 @@ void FieldAccessExpr::print(std::ostream &out, std::size_t indent) const {
 
 namespace {
 
-[[noreturn]] void invalidOperator() { throw std::logic_error("invalid AST operator"); }
+void invalidOperator() { throw std::logic_error("invalid AST operator"); }
 
 } // namespace
 
@@ -319,6 +319,22 @@ void BinaryExpr::print(std::ostream &out, std::size_t indent) const {
     out << "Binary " << binaryOpText(op) << '\n';
     left->print(out, indent + 1);
     right->print(out, indent + 1);
+}
+
+ArrayExpr::ArrayExpr(std::vector<ExprPtr> elements,
+                     std::optional<std::string> repeatCount)
+    : elements(std::move(elements)), repeatCount(std::move(repeatCount)) {}
+
+void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << (repeatCount ? "ArrayRepeat\n" : "Array\n");
+    for (const auto &element : elements) {
+        element->print(out, indent + 1);
+    }
+    if (repeatCount) {
+        detail::printIndent(out, indent + 1);
+        out << "RepeatCount " << *repeatCount << '\n';
+    }
 }
 
 void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
