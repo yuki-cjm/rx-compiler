@@ -1,6 +1,7 @@
 #include "ast_builder.hpp"
 #include "ast.hpp"
 
+#include <memory>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -576,8 +577,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RuleBitOrExpression ||
         context->getRuleIndex() == Parser::RuleClosedBitOrExpression ||
         context->getRuleIndex() == Parser::RuleStatementBitOrExpression ||
-        context->getRuleIndex() ==
-            Parser::RuleStatementClosedBitOrExpression) {
+        context->getRuleIndex() == Parser::RuleStatementClosedBitOrExpression) {
         ExprPtr result;
         bool pendingOr = false;
 
@@ -620,6 +620,32 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             unsupported(context);
         }
         return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleComparisonExpression) {
+        auto *comparison = dynamic_cast<Parser::ComparisonExpressionContext*>(context);
+        if (comparison->comparisonExceptLt() != nullptr) {
+            const std::string op = comparison->comparisonExceptLt()->getText();
+            return std::make_unique<ComparisonExpr>(op, buildExpression(comparison->bitOrExpression(0)), buildExpression(comparison->bitOrExpression(1)));
+        } else if (comparison->LT() != nullptr) {
+            const std::string op = comparison->LT()->getText();
+            return std::make_unique<ComparisonExpr>(op, buildExpression(comparison->closedBitOrExpression()), buildExpression(comparison->bitOrExpression(0)));
+        } else {
+            return buildExpression(comparison->bitOrExpression(0));
+        }
+    }
+
+    if (context->getRuleIndex() == Parser::RuleStatementComparisonExpression) {
+        auto *comparison = dynamic_cast<Parser::StatementComparisonExpressionContext*>(context);
+        if (comparison->comparisonExceptLt() != nullptr) {
+            const std::string op = comparison->comparisonExceptLt()->getText();
+            return std::make_unique<ComparisonExpr>(op, buildExpression(comparison->statementBitOrExpression()), buildExpression(comparison->bitOrExpression()));
+        } else if (comparison->LT() != nullptr) {
+            const std::string op = comparison->LT()->getText();
+            return std::make_unique<ComparisonExpr>(op, buildExpression(comparison->statementClosedBitOrExpression()), buildExpression(comparison->bitOrExpression()));
+        } else {
+            return buildExpression(comparison->statementBitOrExpression());
+        }
     }
 
     const auto children = ruleChildren(context);

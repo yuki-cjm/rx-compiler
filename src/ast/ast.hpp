@@ -113,6 +113,15 @@ struct BinaryExpr final : Expr {
     ExprPtr right;
 };
 
+struct ComparisonExpr final : Expr {
+    ComparisonExpr(std::string op, ExprPtr left, ExprPtr right);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::string op;
+    ExprPtr left;
+    ExprPtr right;
+};
+
 struct Parameter {
     std::string name;
     std::string type;

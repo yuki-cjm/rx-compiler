@@ -69,6 +69,16 @@ void BinaryExpr::print(std::ostream &out, std::size_t indent) const {
     right->print(out, indent + 1);
 }
 
+ComparisonExpr::ComparisonExpr(std::string op, ExprPtr left, ExprPtr right)
+    : op(std::move(op)), left(std::move(left)), right(std::move(right)) {}
+
+void ComparisonExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Comparison " << op << '\n';
+    left->print(out, indent + 1);
+    right->print(out, indent + 1);
+}
+
 void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "EmptyStmt\n";
