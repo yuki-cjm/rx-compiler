@@ -11,6 +11,53 @@
 
 namespace rx::ast {
 
+enum class UnaryOp {
+    Negate,
+    LogicalNot,
+    Dereference,
+    Borrow,
+    BorrowMut,
+    DoubleBorrow,
+    DoubleBorrowMut,
+};
+
+enum class BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+    ShiftLeft,
+    ShiftRight,
+    BitwiseAnd,
+    BitwiseXor,
+    BitwiseOr,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    Equal,
+    NotEqual,
+    LogicalAnd,
+    LogicalOr,
+    Assign,
+    AddAssign,
+    SubtractAssign,
+    MultiplyAssign,
+    DivideAssign,
+    RemainderAssign,
+    BitwiseAndAssign,
+    BitwiseXorAssign,
+    BitwiseOrAssign,
+    ShiftLeftAssign,
+    ShiftRightAssign,
+};
+
+std::string_view unaryOpText(UnaryOp op);
+UnaryOp unaryOpFromText(std::string_view text);
+std::string_view binaryOpText(BinaryOp op);
+BinaryOp binaryOpFromText(std::string_view text);
+
 class ASTNode {
   public:
     virtual ~ASTNode() = default;
@@ -18,19 +65,15 @@ class ASTNode {
 };
 
 class Item : public ASTNode {};
-
 class Stmt : public ASTNode {};
-
-using ItemPtr = std::unique_ptr<Item>;
-using StmtPtr = std::unique_ptr<Stmt>;
-
-struct Expr;
-using ExprPtr = std::unique_ptr<Expr>;
-
 class Expr : public ASTNode {
   public:
     void print(std::ostream &out, std::size_t indent = 0) const override = 0;
 };
+
+using ItemPtr = std::unique_ptr<Item>;
+using StmtPtr = std::unique_ptr<Stmt>;
+using ExprPtr = std::unique_ptr<Expr>;
 
 namespace detail {
 
@@ -42,21 +85,35 @@ inline void printIndent(std::ostream &out, std::size_t indent) {
 
 } // namespace detail
 
-class EmptyStmt final : public Stmt {
- public:
-   void print(std::ostream &out, std::size_t indent = 0) const override;
-};
-
 class Crate final : public ASTNode {
- public:
-   void addItem(ItemPtr item) { items_.push_back(std::move(item)); }
+  public:
+    void addItem(ItemPtr item) { items_.push_back(std::move(item)); }
 
-   void print(std::ostream &out, std::size_t indent = 0) const override;
+    void print(std::ostream &out, std::size_t indent = 0) const override;
 
- private:
-   std::vector<ItemPtr> items_;
+  private:
+    std::vector<ItemPtr> items_;
 };
 
+class EmptyStmt final : public Stmt {
+  public:
+    void print(std::ostream &out, std::size_t indent = 0) const override;
+};
+
+struct LetStmt : public Stmt {
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::string name;
+    std::optional<std::string> type;
+    ExprPtr initializer;
+};
+
+struct ExprStmt : public Stmt {
+    ExprStmt(ExprPtr expression);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr expression;
+};
 
 struct LiteralExpr final : Expr {
     explicit LiteralExpr(std::string value);
@@ -121,52 +178,6 @@ struct FieldAccessExpr final : Expr {
     std::string field;
 };
 
-enum class UnaryOp {
-    Negate,
-    LogicalNot,
-    Dereference,
-    Borrow,
-    BorrowMut,
-    DoubleBorrow,
-    DoubleBorrowMut,
-};
-
-enum class BinaryOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Remainder,
-    ShiftLeft,
-    ShiftRight,
-    BitwiseAnd,
-    BitwiseXor,
-    BitwiseOr,
-    Less,
-    LessEqual,
-    Greater,
-    GreaterEqual,
-    Equal,
-    NotEqual,
-    LogicalAnd,
-    LogicalOr,
-    Assign,
-    AddAssign,
-    SubtractAssign,
-    MultiplyAssign,
-    DivideAssign,
-    RemainderAssign,
-    BitwiseAndAssign,
-    BitwiseXorAssign,
-    BitwiseOrAssign,
-    ShiftLeftAssign,
-    ShiftRightAssign,
-};
-
-std::string_view unaryOpText(UnaryOp op);
-UnaryOp unaryOpFromText(std::string_view text);
-std::string_view binaryOpText(BinaryOp op);
-BinaryOp binaryOpFromText(std::string_view text);
 
 struct UnaryExpr final : Expr {
     UnaryExpr(UnaryOp op, ExprPtr operand);
@@ -207,18 +218,11 @@ struct Parameter {
     std::string type;
 };
 
-struct LetStatement {
-    std::string name;
-    std::optional<std::string> type;
-    ExprPtr initializer;
-};
-
 struct BlockExpr final : Expr {
-    explicit BlockExpr(std::vector<LetStatement> statements = {},
-                       ExprPtr tail = {});
+    explicit BlockExpr(std::vector<StmtPtr> statements = {}, ExprPtr tail = {});
     void print(std::ostream &out, std::size_t indent) const override;
 
-    std::vector<LetStatement> statements;
+    std::vector<StmtPtr> statements;
     ExprPtr tail;
 };
 

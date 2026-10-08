@@ -9,7 +9,7 @@
 namespace rx::ast {
 namespace {
 
-void unsupported(antlr4::ParserRuleContext *context) {
+[[noreturn]] void unsupported(antlr4::ParserRuleContext *context) {
     throw std::runtime_error("AST sample does not support this syntax: " +
                              context->getText());
 }
@@ -65,13 +65,9 @@ AstBuilder::buildFunction(Parser::FunctionDefinitionContext *context) const {
 
 BlockExpr
 AstBuilder::buildBlock(Parser::BlockExpressionContext *context) const {
-    std::vector<LetStatement> statements;
+    std::vector<StmtPtr> statements;
     for (auto *statement : context->statement()) {
-        auto *letStatement = statement->letStatement();
-        if (letStatement == nullptr) {
-            unsupported(statement);
-        }
-        statements.push_back(buildLet(letStatement));
+        statements.push_back(buildStmt(statement));
     }
 
     ExprPtr tail;
@@ -81,14 +77,39 @@ AstBuilder::buildBlock(Parser::BlockExpressionContext *context) const {
     return BlockExpr(std::move(statements), std::move(tail));
 }
 
-LetStatement AstBuilder::buildLet(Parser::LetStatementContext *context) const {
-    LetStatement statement;
-    statement.name = context->identifierBinding()->getText();
-    if (auto *type = context->typeRef()) {
-        statement.type = type->getText();
+StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
+    if (auto *let = context->letStatement()) {
+        auto statement = std::make_unique<LetStmt>();
+        statement->name = let->identifierBinding()->getText();
+        if (auto *type = let->typeRef()) {
+            statement->type = type->getText();
+        }
+        statement->initializer = buildExpression(let->expression());
+        return statement;
     }
-    statement.initializer = buildExpression(context->expression());
-    return statement;
+
+    if (auto *expressionWithBlock = context->expressionWithBlock()) {
+        ExprPtr expression;
+        if (expressionWithBlock->blockExpression() != nullptr) {
+            expression =
+                buildExpression(expressionWithBlock->blockExpression());
+        } else if (expressionWithBlock->ifExpression() != nullptr) {
+            expression = buildExpression(expressionWithBlock->ifExpression());
+        } else {
+            unsupported(expressionWithBlock);
+        }
+        return std::make_unique<ExprStmt>(std::move(expression));
+    }
+
+    if (auto *expression = context->statementExpression()) {
+        return std::make_unique<ExprStmt>(buildExpression(expression));
+    }
+
+    if (context->SEMI() != nullptr) {
+        return std::make_unique<EmptyStmt>();
+    }
+
+    unsupported(context);
 }
 
 ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
@@ -102,9 +123,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return buildExpression(operandContext);
     };
 
-    const auto applyDotSuffix = [this](
-                                    ExprPtr result,
-                                    Parser::DotSuffixContext *dotSuffix) {
+    const auto applyDotSuffix = [this](ExprPtr result,
+                                       Parser::DotSuffixContext *dotSuffix) {
         std::string field;
         if (dotSuffix->pathExprSegment() != nullptr) {
             field = dotSuffix->pathExprSegment()->getText();
@@ -147,8 +167,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                         std::move(result),
                         buildExpression(suffix->expression()));
                 } else if (suffix->dotSuffix() != nullptr) {
-                    result = applyDotSuffix(std::move(result),
-                                            suffix->dotSuffix());
+                    result =
+                        applyDotSuffix(std::move(result), suffix->dotSuffix());
                 } else {
                     unsupported(suffix);
                 }
@@ -157,16 +177,19 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         };
 
     if (context->getRuleIndex() == Parser::RulePostfixExpression) {
-        auto *postfix = dynamic_cast<Parser::PostfixExpressionContext *>(context);
-        return applyPostfixSuffixes(buildExpression(postfix->primaryExpression()),
-                                    postfix->postfixSuffix());
+        auto *postfix =
+            dynamic_cast<Parser::PostfixExpressionContext *>(context);
+        return applyPostfixSuffixes(
+            buildExpression(postfix->primaryExpression()),
+            postfix->postfixSuffix());
     }
 
     if (context->getRuleIndex() == Parser::RuleConditionPostfixExpression) {
         auto *postfix =
             dynamic_cast<Parser::ConditionPostfixExpressionContext *>(context);
-        return applyPostfixSuffixes(buildExpression(postfix->conditionPrimary()),
-                                    postfix->postfixSuffix());
+        return applyPostfixSuffixes(
+            buildExpression(postfix->conditionPrimary()),
+            postfix->postfixSuffix());
     }
 
     if (context->getRuleIndex() ==
@@ -205,7 +228,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RulePrimaryExpression) {
-        auto *primary = dynamic_cast<Parser::PrimaryExpressionContext *>(context);
+        auto *primary =
+            dynamic_cast<Parser::PrimaryExpressionContext *>(context);
         if (primary->expressionWithBlock() != nullptr) {
             auto *expressionWithBlock = primary->expressionWithBlock();
             if (expressionWithBlock->blockExpression() != nullptr) {
@@ -220,7 +244,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RuleConditionPrimary) {
-        auto *primary = dynamic_cast<Parser::ConditionPrimaryContext *>(context);
+        auto *primary =
+            dynamic_cast<Parser::ConditionPrimaryContext *>(context);
         if (primary->blockExpression() != nullptr) {
             return buildExpression(primary->blockExpression());
         }
@@ -287,8 +312,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         }
 
         for (auto *targetType : targetTypes) {
-            result = std::make_unique<CastExpr>(
-                std::move(result), targetType->getText());
+            result = std::make_unique<CastExpr>(std::move(result),
+                                                targetType->getText());
         }
         return result;
     }
@@ -708,8 +733,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             closedCast->closedCastType()->getText());
     }
 
-    if (context->getRuleIndex() ==
-        Parser::RuleConditionClosedCastExpression) {
+    if (context->getRuleIndex() == Parser::RuleConditionClosedCastExpression) {
         auto *closedCast =
             dynamic_cast<Parser::ConditionClosedCastExpressionContext *>(
                 context);
@@ -726,8 +750,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         context->getRuleIndex() == Parser::RuleStatementShiftExpression ||
         context->getRuleIndex() == Parser::RuleStatementClosedShiftExpression ||
         context->getRuleIndex() == Parser::RuleConditionShiftExpression ||
-        context->getRuleIndex() ==
-            Parser::RuleConditionClosedShiftExpression) {
+        context->getRuleIndex() == Parser::RuleConditionClosedShiftExpression) {
         ExprPtr result;
         std::string pendingOperator;
 
@@ -996,8 +1019,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                 unsupported(context);
             }
             return std::make_unique<BinaryExpr>(
-                op, buildExpression(operands[0]),
-                buildExpression(operands[1]));
+                op, buildExpression(operands[0]), buildExpression(operands[1]));
         }
         if (comparison->LT() != nullptr) {
             if (comparison->conditionBitOrExpression().size() != 1 ||
@@ -1120,20 +1142,29 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RuleAssignmentExpression) {
-        auto *assignment = dynamic_cast<Parser::AssignmentExpressionContext *>(context);
+        auto *assignment =
+            dynamic_cast<Parser::AssignmentExpressionContext *>(context);
         if (assignment->assignmentOperator() != nullptr) {
-            const auto op = binaryOpFromText(assignment->assignmentOperator()->getText());
-            return std::make_unique<BinaryExpr>(op, buildExpression(assignment->logicalOrExpression()), buildExpression(assignment->expression()));
+            const auto op =
+                binaryOpFromText(assignment->assignmentOperator()->getText());
+            return std::make_unique<BinaryExpr>(
+                op, buildExpression(assignment->logicalOrExpression()),
+                buildExpression(assignment->expression()));
         } else {
             return buildExpression(assignment->logicalOrExpression());
         }
     }
 
     if (context->getRuleIndex() == Parser::RuleStatementAssignmentExpression) {
-        auto *assignment = dynamic_cast<Parser::StatementAssignmentExpressionContext *>(context);
+        auto *assignment =
+            dynamic_cast<Parser::StatementAssignmentExpressionContext *>(
+                context);
         if (assignment->assignmentOperator() != nullptr) {
-            const auto op = binaryOpFromText(assignment->assignmentOperator()->getText());
-            return std::make_unique<BinaryExpr>(op, buildExpression(assignment->statementLogicalOrExpression()), buildExpression(assignment->expression()));
+            const auto op =
+                binaryOpFromText(assignment->assignmentOperator()->getText());
+            return std::make_unique<BinaryExpr>(
+                op, buildExpression(assignment->statementLogicalOrExpression()),
+                buildExpression(assignment->expression()));
         } else {
             return buildExpression(assignment->statementLogicalOrExpression());
         }
@@ -1145,12 +1176,12 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return buildExpression(condition->conditionAssignmentExpression());
     }
 
-    if (context->getRuleIndex() ==
-        Parser::RuleConditionAssignmentExpression) {
+    if (context->getRuleIndex() == Parser::RuleConditionAssignmentExpression) {
         auto *assignment =
             dynamic_cast<Parser::ConditionAssignmentExpressionContext *>(
                 context);
-        ExprPtr left = buildExpression(assignment->conditionLogicalOrExpression());
+        ExprPtr left =
+            buildExpression(assignment->conditionLogicalOrExpression());
         if (assignment->assignmentOperator() == nullptr) {
             return left;
         }
@@ -1158,7 +1189,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         const auto op =
             binaryOpFromText(assignment->assignmentOperator()->getText());
         return std::make_unique<BinaryExpr>(
-            op, std::move(left), buildExpression(assignment->conditionExpression()));
+            op, std::move(left),
+            buildExpression(assignment->conditionExpression()));
     }
 
     if (context->getRuleIndex() == Parser::RuleArrayExpression) {
@@ -1201,9 +1233,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             unsupported(context);
         }
 
-        return std::make_unique<IfExpr>(std::move(condition),
-                                        std::move(thenBranch),
-                                        std::move(elseBranch));
+        return std::make_unique<IfExpr>(
+            std::move(condition), std::move(thenBranch), std::move(elseBranch));
     }
 
     const auto children = ruleChildren(context);

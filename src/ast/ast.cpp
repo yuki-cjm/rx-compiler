@@ -337,20 +337,24 @@ void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
-BlockExpr::BlockExpr(std::vector<LetStatement> statements, ExprPtr tail)
+BlockExpr::BlockExpr(std::vector<StmtPtr> statements, ExprPtr tail)
     : statements(std::move(statements)), tail(std::move(tail)) {}
+
+void LetStmt::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Let " << name;
+    if (type) {
+        out << ": " << *type;
+    }
+    out << '\n';
+    initializer->print(out, indent + 1);
+}
 
 void BlockExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Block\n";
     for (const auto &statement : statements) {
-        detail::printIndent(out, indent + 1);
-        out << "Let " << statement.name;
-        if (statement.type) {
-            out << ": " << *statement.type;
-        }
-        out << '\n';
-        statement.initializer->print(out, indent + 2);
+        statement->print(out, indent + 1);
     }
     if (tail) {
         detail::printIndent(out, indent + 1);
@@ -378,6 +382,14 @@ void IfExpr::print(std::ostream &out, std::size_t indent) const {
 void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "EmptyStmt\n";
+}
+
+ExprStmt::ExprStmt(ExprPtr expression) : expression(std::move(expression)) {}
+
+void ExprStmt::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "ExprStmt\n";
+    expression->print(out, indent + 1);
 }
 
 void Crate::print(std::ostream &out, std::size_t indent) const {
