@@ -712,7 +712,10 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RuleShiftExpression ||
         context->getRuleIndex() == Parser::RuleClosedShiftExpression ||
         context->getRuleIndex() == Parser::RuleStatementShiftExpression ||
-        context->getRuleIndex() == Parser::RuleStatementClosedShiftExpression) {
+        context->getRuleIndex() == Parser::RuleStatementClosedShiftExpression ||
+        context->getRuleIndex() == Parser::RuleConditionShiftExpression ||
+        context->getRuleIndex() ==
+            Parser::RuleConditionClosedShiftExpression) {
         ExprPtr result;
         std::string pendingOperator;
 
@@ -735,12 +738,13 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                 continue;
             }
 
-            if (rule->getRuleIndex() == Parser::RuleAdditiveExpression ||
-                rule->getRuleIndex() == Parser::RuleClosedAdditiveExpression ||
-                rule->getRuleIndex() ==
-                    Parser::RuleStatementAdditiveExpression ||
-                rule->getRuleIndex() ==
-                    Parser::RuleStatementClosedAdditiveExpression) {
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleAdditiveExpression ||
+                ruleIndex == Parser::RuleClosedAdditiveExpression ||
+                ruleIndex == Parser::RuleStatementAdditiveExpression ||
+                ruleIndex == Parser::RuleStatementClosedAdditiveExpression ||
+                ruleIndex == Parser::RuleConditionAdditiveExpression ||
+                ruleIndex == Parser::RuleConditionClosedAdditiveExpression) {
                 ExprPtr operand = buildExpression(rule);
 
                 if (!result) {
@@ -769,7 +773,10 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         context->getRuleIndex() == Parser::RuleClosedBitAndExpression ||
         context->getRuleIndex() == Parser::RuleStatementBitAndExpression ||
         context->getRuleIndex() ==
-            Parser::RuleStatementClosedBitAndExpression) {
+            Parser::RuleStatementClosedBitAndExpression ||
+        context->getRuleIndex() == Parser::RuleConditionBitAndExpression ||
+        context->getRuleIndex() ==
+            Parser::RuleConditionClosedBitAndExpression) {
         ExprPtr result;
         bool pendingAnd = false;
 
@@ -793,7 +800,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             if (ruleIndex == Parser::RuleShiftExpression ||
                 ruleIndex == Parser::RuleClosedShiftExpression ||
                 ruleIndex == Parser::RuleStatementShiftExpression ||
-                ruleIndex == Parser::RuleStatementClosedShiftExpression) {
+                ruleIndex == Parser::RuleStatementClosedShiftExpression ||
+                ruleIndex == Parser::RuleConditionShiftExpression ||
+                ruleIndex == Parser::RuleConditionClosedShiftExpression) {
                 ExprPtr operand = buildExpression(rule);
                 if (!result) {
                     result = std::move(operand);
@@ -819,7 +828,10 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         context->getRuleIndex() == Parser::RuleClosedBitXorExpression ||
         context->getRuleIndex() == Parser::RuleStatementBitXorExpression ||
         context->getRuleIndex() ==
-            Parser::RuleStatementClosedBitXorExpression) {
+            Parser::RuleStatementClosedBitXorExpression ||
+        context->getRuleIndex() == Parser::RuleConditionBitXorExpression ||
+        context->getRuleIndex() ==
+            Parser::RuleConditionClosedBitXorExpression) {
         ExprPtr result;
         bool pendingXor = false;
 
@@ -843,7 +855,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             if (ruleIndex == Parser::RuleBitAndExpression ||
                 ruleIndex == Parser::RuleClosedBitAndExpression ||
                 ruleIndex == Parser::RuleStatementBitAndExpression ||
-                ruleIndex == Parser::RuleStatementClosedBitAndExpression) {
+                ruleIndex == Parser::RuleStatementClosedBitAndExpression ||
+                ruleIndex == Parser::RuleConditionBitAndExpression ||
+                ruleIndex == Parser::RuleConditionClosedBitAndExpression) {
                 ExprPtr operand = buildExpression(rule);
                 if (!result) {
                     result = std::move(operand);
@@ -868,7 +882,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RuleBitOrExpression ||
         context->getRuleIndex() == Parser::RuleClosedBitOrExpression ||
         context->getRuleIndex() == Parser::RuleStatementBitOrExpression ||
-        context->getRuleIndex() == Parser::RuleStatementClosedBitOrExpression) {
+        context->getRuleIndex() == Parser::RuleStatementClosedBitOrExpression ||
+        context->getRuleIndex() == Parser::RuleConditionBitOrExpression ||
+        context->getRuleIndex() == Parser::RuleConditionClosedBitOrExpression) {
         ExprPtr result;
         bool pendingOr = false;
 
@@ -892,7 +908,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             if (ruleIndex == Parser::RuleBitXorExpression ||
                 ruleIndex == Parser::RuleClosedBitXorExpression ||
                 ruleIndex == Parser::RuleStatementBitXorExpression ||
-                ruleIndex == Parser::RuleStatementClosedBitXorExpression) {
+                ruleIndex == Parser::RuleStatementClosedBitXorExpression ||
+                ruleIndex == Parser::RuleConditionBitXorExpression ||
+                ruleIndex == Parser::RuleConditionClosedBitXorExpression) {
                 ExprPtr operand = buildExpression(rule);
                 if (!result) {
                     result = std::move(operand);
@@ -954,9 +972,43 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         }
     }
 
+    if (context->getRuleIndex() == Parser::RuleConditionComparisonExpression) {
+        auto *comparison =
+            dynamic_cast<Parser::ConditionComparisonExpressionContext *>(
+                context);
+        if (comparison->comparisonExceptLt() != nullptr) {
+            const auto op =
+                binaryOpFromText(comparison->comparisonExceptLt()->getText());
+            const auto operands = comparison->conditionBitOrExpression();
+            if (operands.size() != 2) {
+                unsupported(context);
+            }
+            return std::make_unique<BinaryExpr>(
+                op, buildExpression(operands[0]),
+                buildExpression(operands[1]));
+        }
+        if (comparison->LT() != nullptr) {
+            if (comparison->conditionBitOrExpression().size() != 1 ||
+                comparison->conditionClosedBitOrExpression() == nullptr) {
+                unsupported(context);
+            }
+            return std::make_unique<BinaryExpr>(
+                BinaryOp::Less,
+                buildExpression(comparison->conditionClosedBitOrExpression()),
+                buildExpression(comparison->conditionBitOrExpression(0)));
+        }
+
+        const auto operands = comparison->conditionBitOrExpression();
+        if (operands.size() != 1) {
+            unsupported(context);
+        }
+        return buildExpression(operands[0]);
+    }
+
     const auto ruleIndex = context->getRuleIndex();
     if (ruleIndex == Parser::RuleLogicalAndExpression ||
-        ruleIndex == Parser::RuleStatementLogicalAndExpression) {
+        ruleIndex == Parser::RuleStatementLogicalAndExpression ||
+        ruleIndex == Parser::RuleConditionLogicalAndExpression) {
         std::vector<antlr4::ParserRuleContext *> operands;
         bool pendingAnd = false;
 
@@ -977,7 +1029,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
 
             const auto childRuleIndex = rule->getRuleIndex();
             if (childRuleIndex == Parser::RuleComparisonExpression ||
-                childRuleIndex == Parser::RuleStatementComparisonExpression) {
+                childRuleIndex == Parser::RuleStatementComparisonExpression ||
+                childRuleIndex == Parser::RuleConditionComparisonExpression) {
                 if (!operands.empty() && !pendingAnd) {
                     unsupported(context);
                 }
@@ -1004,7 +1057,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (ruleIndex == Parser::RuleLogicalOrExpression ||
-        ruleIndex == Parser::RuleStatementLogicalOrExpression) {
+        ruleIndex == Parser::RuleStatementLogicalOrExpression ||
+        ruleIndex == Parser::RuleConditionLogicalOrExpression) {
         std::vector<antlr4::ParserRuleContext *> operands;
         bool pendingOr = false;
 
@@ -1026,7 +1080,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
 
             const auto childRuleIndex = rule->getRuleIndex();
             if (childRuleIndex == Parser::RuleLogicalAndExpression ||
-                childRuleIndex == Parser::RuleStatementLogicalAndExpression) {
+                childRuleIndex == Parser::RuleStatementLogicalAndExpression ||
+                childRuleIndex == Parser::RuleConditionLogicalAndExpression) {
                 if (!operands.empty() && !pendingOr) {
                     unsupported(context);
                 }
@@ -1070,6 +1125,28 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         } else {
             return buildExpression(assignment->statementLogicalOrExpression());
         }
+    }
+
+    if (context->getRuleIndex() == Parser::RuleConditionExpression) {
+        auto *condition =
+            dynamic_cast<Parser::ConditionExpressionContext *>(context);
+        return buildExpression(condition->conditionAssignmentExpression());
+    }
+
+    if (context->getRuleIndex() ==
+        Parser::RuleConditionAssignmentExpression) {
+        auto *assignment =
+            dynamic_cast<Parser::ConditionAssignmentExpressionContext *>(
+                context);
+        ExprPtr left = buildExpression(assignment->conditionLogicalOrExpression());
+        if (assignment->assignmentOperator() == nullptr) {
+            return left;
+        }
+
+        const auto op =
+            binaryOpFromText(assignment->assignmentOperator()->getText());
+        return std::make_unique<BinaryExpr>(
+            op, std::move(left), buildExpression(assignment->conditionExpression()));
     }
 
     if (context->getRuleIndex() == Parser::RuleArrayExpression) {
