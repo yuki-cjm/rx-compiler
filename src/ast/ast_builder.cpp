@@ -225,10 +225,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         ExprPtr result = buildExpression(operands.front());
         for (std::size_t i = 1; i < operands.size(); ++i) {
             result = std::make_unique<BinaryExpr>(
-                binaryOpFromText(
-                    additive->additiveOperator(i - 1)->getText()),
-                std::move(result),
-                buildExpression(operands[i]));
+                binaryOpFromText(additive->additiveOperator(i - 1)->getText()),
+                std::move(result), buildExpression(operands[i]));
         }
         return result;
     }
@@ -245,10 +243,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         ExprPtr result = buildExpression(operands.front());
         for (std::size_t i = 1; i < operands.size(); ++i) {
             result = std::make_unique<BinaryExpr>(
-                binaryOpFromText(
-                    additive->additiveOperator(i - 1)->getText()),
-                std::move(result),
-                buildExpression(operands[i]));
+                binaryOpFromText(additive->additiveOperator(i - 1)->getText()),
+                std::move(result), buildExpression(operands[i]));
         }
         return result;
     }
@@ -517,9 +513,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                     if (!pendingAnd) {
                         unsupported(context);
                     }
-                    result = std::make_unique<BinaryExpr>(
-                        BinaryOp::BitwiseAnd, std::move(result),
-                        std::move(operand));
+                    result = std::make_unique<BinaryExpr>(BinaryOp::BitwiseAnd,
+                                                          std::move(result),
+                                                          std::move(operand));
                     pendingAnd = false;
                 }
             }
@@ -567,9 +563,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                     if (!pendingXor) {
                         unsupported(context);
                     }
-                    result = std::make_unique<BinaryExpr>(
-                        BinaryOp::BitwiseXor, std::move(result),
-                        std::move(operand));
+                    result = std::make_unique<BinaryExpr>(BinaryOp::BitwiseXor,
+                                                          std::move(result),
+                                                          std::move(operand));
                     pendingXor = false;
                 }
             }
@@ -616,9 +612,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                     if (!pendingOr) {
                         unsupported(context);
                     }
-                    result = std::make_unique<BinaryExpr>(
-                        BinaryOp::BitwiseOr, std::move(result),
-                        std::move(operand));
+                    result = std::make_unique<BinaryExpr>(BinaryOp::BitwiseOr,
+                                                          std::move(result),
+                                                          std::move(operand));
                     pendingOr = false;
                 }
             }
@@ -634,8 +630,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         auto *comparison =
             dynamic_cast<Parser::ComparisonExpressionContext *>(context);
         if (comparison->comparisonExceptLt() != nullptr) {
-            const auto op = binaryOpFromText(
-                comparison->comparisonExceptLt()->getText());
+            const auto op =
+                binaryOpFromText(comparison->comparisonExceptLt()->getText());
             return std::make_unique<BinaryExpr>(
                 op, buildExpression(comparison->bitOrExpression(0)),
                 buildExpression(comparison->bitOrExpression(1)));
@@ -654,8 +650,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             dynamic_cast<Parser::StatementComparisonExpressionContext *>(
                 context);
         if (comparison->comparisonExceptLt() != nullptr) {
-            const auto op = binaryOpFromText(
-                comparison->comparisonExceptLt()->getText());
+            const auto op =
+                binaryOpFromText(comparison->comparisonExceptLt()->getText());
             return std::make_unique<BinaryExpr>(
                 op, buildExpression(comparison->statementBitOrExpression()),
                 buildExpression(comparison->bitOrExpression()));
@@ -712,9 +708,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
 
         ExprPtr result = buildExpression(operands.front());
         for (std::size_t i = 1; i < operands.size(); ++i) {
-            result = std::make_unique<BinaryExpr>(
-                BinaryOp::LogicalAnd, std::move(result),
-                buildExpression(operands[i]));
+            result = std::make_unique<BinaryExpr>(BinaryOp::LogicalAnd,
+                                                  std::move(result),
+                                                  buildExpression(operands[i]));
         }
         return result;
     }
@@ -761,11 +757,31 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
 
         ExprPtr result = buildExpression(operands.front());
         for (std::size_t i = 1; i < operands.size(); ++i) {
-            result = std::make_unique<BinaryExpr>(
-                BinaryOp::LogicalOr, std::move(result),
-                buildExpression(operands[i]));
+            result = std::make_unique<BinaryExpr>(BinaryOp::LogicalOr,
+                                                  std::move(result),
+                                                  buildExpression(operands[i]));
         }
         return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleAssignmentExpression) {
+        auto *assignment = dynamic_cast<Parser::AssignmentExpressionContext *>(context);
+        if (assignment->assignmentOperator() != nullptr) {
+            const auto op = binaryOpFromText(assignment->assignmentOperator()->getText());
+            return std::make_unique<BinaryExpr>(op, buildExpression(assignment->logicalOrExpression()), buildExpression(assignment->expression()));
+        } else {
+            return buildExpression(assignment->logicalOrExpression());
+        }
+    }
+
+    if (context->getRuleIndex() == Parser::RuleStatementAssignmentExpression) {
+        auto *assignment = dynamic_cast<Parser::StatementAssignmentExpressionContext *>(context);
+        if (assignment->assignmentOperator() != nullptr) {
+            const auto op = binaryOpFromText(assignment->assignmentOperator()->getText());
+            return std::make_unique<BinaryExpr>(op, buildExpression(assignment->statementLogicalOrExpression()), buildExpression(assignment->expression()));
+        } else {
+            return buildExpression(assignment->statementLogicalOrExpression());
+        }
     }
 
     const auto children = ruleChildren(context);
