@@ -337,6 +337,28 @@ void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+BlockExpr::BlockExpr(std::vector<LetStatement> statements, ExprPtr tail)
+    : statements(std::move(statements)), tail(std::move(tail)) {}
+
+void BlockExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Block\n";
+    for (const auto &statement : statements) {
+        detail::printIndent(out, indent + 1);
+        out << "Let " << statement.name;
+        if (statement.type) {
+            out << ": " << *statement.type;
+        }
+        out << '\n';
+        statement.initializer->print(out, indent + 2);
+    }
+    if (tail) {
+        detail::printIndent(out, indent + 1);
+        out << "Tail\n";
+        tail->print(out, indent + 2);
+    }
+}
+
 void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "EmptyStmt\n";
@@ -364,19 +386,7 @@ void Program::print(std::ostream &out) const {
                 << '\n';
         }
 
-        out << "    Block\n";
-        for (const auto &statement : function.body.statements) {
-            out << "      Let " << statement.name;
-            if (statement.type) {
-                out << ": " << *statement.type;
-            }
-            out << '\n';
-            statement.initializer->print(out, 4);
-        }
-        if (function.body.tail) {
-            out << "      Tail\n";
-            function.body.tail->print(out, 4);
-        }
+        function.body.print(out, 2);
     }
 }
 

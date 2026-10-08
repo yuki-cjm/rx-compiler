@@ -11,7 +11,7 @@ class AstBuilder {
 
   private:
     Function buildFunction(Parser::FunctionDefinitionContext *context) const;
-    Block buildBlock(Parser::BlockExpressionContext *context) const;
+    BlockExpr buildBlock(Parser::BlockExpressionContext *context) const;
     LetStatement buildLet(Parser::LetStatementContext *context) const;
     ExprPtr buildExpression(antlr4::ParserRuleContext *context) const;
 };

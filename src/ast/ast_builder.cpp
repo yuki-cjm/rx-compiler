@@ -63,20 +63,22 @@ AstBuilder::buildFunction(Parser::FunctionDefinitionContext *context) const {
     return function;
 }
 
-Block AstBuilder::buildBlock(Parser::BlockExpressionContext *context) const {
-    Block block;
+BlockExpr
+AstBuilder::buildBlock(Parser::BlockExpressionContext *context) const {
+    std::vector<LetStatement> statements;
     for (auto *statement : context->statement()) {
         auto *letStatement = statement->letStatement();
         if (letStatement == nullptr) {
             unsupported(statement);
         }
-        block.statements.push_back(buildLet(letStatement));
+        statements.push_back(buildLet(letStatement));
     }
 
-    if (auto *tail = context->statementExpression()) {
-        block.tail = buildExpression(tail);
+    ExprPtr tail;
+    if (auto *tailContext = context->statementExpression()) {
+        tail = buildExpression(tailContext);
     }
-    return block;
+    return BlockExpr(std::move(statements), std::move(tail));
 }
 
 LetStatement AstBuilder::buildLet(Parser::LetStatementContext *context) const {
@@ -181,7 +183,16 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         auto *postfix =
             dynamic_cast<Parser::StatementPostfixExpressionContext *>(context);
         if (postfix->expressionWithBlock() != nullptr) {
-            unsupported(postfix->expressionWithBlock());
+            auto *expressionWithBlock = postfix->expressionWithBlock();
+            if (expressionWithBlock->blockExpression() == nullptr ||
+                postfix->dotSuffix() == nullptr) {
+                unsupported(expressionWithBlock);
+            }
+            ExprPtr result =
+                buildExpression(expressionWithBlock->blockExpression());
+            result = applyDotSuffix(std::move(result), postfix->dotSuffix());
+            return applyPostfixSuffixes(std::move(result),
+                                        postfix->postfixSuffix());
         }
         return applyPostfixSuffixes(buildExpression(postfix->nonBlockPrimary()),
                                     postfix->postfixSuffix());
@@ -190,7 +201,11 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RulePrimaryExpression) {
         auto *primary = dynamic_cast<Parser::PrimaryExpressionContext *>(context);
         if (primary->expressionWithBlock() != nullptr) {
-            unsupported(primary->expressionWithBlock());
+            if (primary->expressionWithBlock()->blockExpression() == nullptr) {
+                unsupported(primary->expressionWithBlock());
+            }
+            return buildExpression(
+                primary->expressionWithBlock()->blockExpression());
         }
         return buildExpression(primary->nonBlockPrimary());
     }
@@ -198,9 +213,14 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RuleConditionPrimary) {
         auto *primary = dynamic_cast<Parser::ConditionPrimaryContext *>(context);
         if (primary->blockExpression() != nullptr) {
-            unsupported(primary->blockExpression());
+            return buildExpression(primary->blockExpression());
         }
         return buildExpression(primary->conditionPrimaryWithoutBareBlock());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleBlockExpression) {
+        auto *block = dynamic_cast<Parser::BlockExpressionContext *>(context);
+        return std::make_unique<BlockExpr>(buildBlock(block));
     }
 
     if (context->getRuleIndex() == Parser::RuleUnaryExpression) {

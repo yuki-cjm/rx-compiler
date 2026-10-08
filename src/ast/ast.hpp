@@ -213,7 +213,11 @@ struct LetStatement {
     ExprPtr initializer;
 };
 
-struct Block {
+struct BlockExpr final : Expr {
+    explicit BlockExpr(std::vector<LetStatement> statements = {},
+                       ExprPtr tail = {});
+    void print(std::ostream &out, std::size_t indent) const override;
+
     std::vector<LetStatement> statements;
     ExprPtr tail;
 };
@@ -222,7 +226,7 @@ struct Function {
     std::string name;
     std::vector<Parameter> parameters;
     std::optional<std::string> returnType;
-    Block body;
+    BlockExpr body;
 };
 
 struct Program {
