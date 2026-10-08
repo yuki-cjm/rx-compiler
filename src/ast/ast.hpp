@@ -89,6 +89,13 @@ struct NameExpr final : Expr {
     std::string name;
 };
 
+struct PathExpr final : Expr {
+    explicit PathExpr(std::vector<std::string> segments);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::vector<std::string> segments;
+};
+
 struct BinaryExpr final : Expr {
     BinaryExpr(std::string op, ExprPtr left, ExprPtr right);
     void print(std::ostream &out, std::size_t indent) const override;

@@ -38,6 +38,18 @@ void NameExpr::print(std::ostream &out, std::size_t indent) const {
     out << "Name " << name << '\n';
 }
 
+PathExpr::PathExpr(std::vector<std::string> segments)
+    : segments(std::move(segments)) {}
+
+void PathExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Path\n";
+    for (const auto &segment : segments) {
+        detail::printIndent(out, indent + 1);
+        out << "Segment " << segment << '\n';
+    }
+}
+
 BinaryExpr::BinaryExpr(std::string op, ExprPtr left, ExprPtr right)
     : op(std::move(op)), left(std::move(left)), right(std::move(right)) {}
 

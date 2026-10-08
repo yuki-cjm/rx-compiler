@@ -1,4 +1,5 @@
 #include "ast_builder.hpp"
+#include "ast.hpp"
 
 #include <stdexcept>
 #include <utility>
@@ -7,7 +8,7 @@
 namespace rx::ast {
 namespace {
 
-[[noreturn]] void unsupported(antlr4::ParserRuleContext *context) {
+void unsupported(antlr4::ParserRuleContext *context) {
     throw std::runtime_error("AST sample does not support this syntax: " +
                              context->getText());
 }
@@ -99,9 +100,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RuleNonBlockPrimary ||
-        context->getRuleIndex() == Parser::RuleConditionPrimaryWithoutBareBlock) {
-        auto *primary =
-            dynamic_cast<Parser::NonBlockPrimaryContext *>(context);
+        context->getRuleIndex() ==
+            Parser::RuleConditionPrimaryWithoutBareBlock) {
+        auto *primary = dynamic_cast<Parser::NonBlockPrimaryContext *>(context);
         if (primary != nullptr && primary->LPAREN() != nullptr) {
             if (primary->expression() == nullptr) {
                 return std::make_unique<UnitExpr>();
@@ -122,7 +123,13 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RulePathInExpression) {
-        return std::make_unique<NameExpr>(context->getText());
+        auto *path = dynamic_cast<Parser::PathInExpressionContext*>(context);
+
+        std::vector<std::string> segments;
+        for (auto *segment : path->pathExprSegment()) {
+            segments.push_back(segment->getText());
+        }
+        return std::make_unique<PathExpr>(std::move(segments));
     }
 
     if (context->getRuleIndex() == Parser::RuleAdditiveExpression) {
