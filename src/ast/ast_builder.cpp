@@ -146,6 +146,40 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return std::make_unique<BooleanLiteralExpr>(literal->TRUE() != nullptr);
     }
 
+    if (context->getRuleIndex() == Parser::RuleMultiplicativeExpression) {
+        auto *multiplicative = dynamic_cast<Parser::MultiplicativeExpressionContext *>(context);
+        const auto operands = multiplicative->castExpression();
+        const auto operators = multiplicative->multiplicativeOperator();
+
+        ExprPtr result = buildExpression(operands.front());
+
+        for (std::size_t i = 0; i < operators.size(); i++) {
+            result = std::make_unique<BinaryExpr> (
+                operators[i]->getText(),
+                std::move(result),
+                buildExpression(operands[i + 1])
+            );
+        }
+
+        return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleStatementMultiplicativeExpression) {
+        auto *multiplicative = dynamic_cast<Parser::StatementMultiplicativeExpressionContext *>(context);
+        const auto operators = multiplicative->multiplicativeOperator();
+
+        ExprPtr result = buildExpression(multiplicative->statementCastExpression());
+        const auto operands = multiplicative->castExpression();
+
+        for (std::size_t i = 0; i < operators.size(); ++i) {
+            result = std::make_unique<BinaryExpr>(
+                operators[i]->getText(), std::move(result),
+                buildExpression(operands[i]));
+        }
+
+        return result;
+    }
+
     if (context->getRuleIndex() == Parser::RuleNonBlockPrimary ||
         context->getRuleIndex() ==
             Parser::RuleConditionPrimaryWithoutBareBlock) {
