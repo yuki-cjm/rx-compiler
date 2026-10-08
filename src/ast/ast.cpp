@@ -51,6 +51,41 @@ void PathExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+CallExpr::CallExpr(ExprPtr callee, std::vector<ExprPtr> arguments)
+    : callee(std::move(callee)), arguments(std::move(arguments)) {}
+
+void CallExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Call\n";
+    detail::printIndent(out, indent + 1);
+    out << "Callee\n";
+    callee->print(out, indent + 2);
+    detail::printIndent(out, indent + 1);
+    out << "Arguments\n";
+    for (const auto &argument : arguments) {
+        argument->print(out, indent + 2);
+    }
+}
+
+IndexExpr::IndexExpr(ExprPtr operand, ExprPtr index)
+    : operand(std::move(operand)), index(std::move(index)) {}
+
+void IndexExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Index\n";
+    operand->print(out, indent + 1);
+    index->print(out, indent + 1);
+}
+
+FieldAccessExpr::FieldAccessExpr(ExprPtr operand, std::string field)
+    : operand(std::move(operand)), field(std::move(field)) {}
+
+void FieldAccessExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "FieldAccess " << field << '\n';
+    operand->print(out, indent + 1);
+}
+
 namespace {
 
 [[noreturn]] void invalidOperator() { throw std::logic_error("invalid AST operator"); }
@@ -264,6 +299,15 @@ UnaryExpr::UnaryExpr(UnaryOp op, ExprPtr operand)
 void UnaryExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Unary " << unaryOpText(op) << '\n';
+    operand->print(out, indent + 1);
+}
+
+CastExpr::CastExpr(ExprPtr operand, std::string targetType)
+    : operand(std::move(operand)), targetType(std::move(targetType)) {}
+
+void CastExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Cast as " << targetType << '\n';
     operand->print(out, indent + 1);
 }
 

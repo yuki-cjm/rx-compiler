@@ -97,6 +97,30 @@ struct PathExpr final : Expr {
     std::vector<std::string> segments;
 };
 
+struct CallExpr final : Expr {
+    CallExpr(ExprPtr callee, std::vector<ExprPtr> arguments);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr callee;
+    std::vector<ExprPtr> arguments;
+};
+
+struct IndexExpr final : Expr {
+    IndexExpr(ExprPtr operand, ExprPtr index);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr operand;
+    ExprPtr index;
+};
+
+struct FieldAccessExpr final : Expr {
+    FieldAccessExpr(ExprPtr operand, std::string field);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr operand;
+    std::string field;
+};
+
 enum class UnaryOp {
     Negate,
     LogicalNot,
@@ -150,6 +174,14 @@ struct UnaryExpr final : Expr {
 
     UnaryOp op;
     ExprPtr operand;
+};
+
+struct CastExpr final : Expr {
+    CastExpr(ExprPtr operand, std::string targetType);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr operand;
+    std::string targetType;
 };
 
 struct BinaryExpr final : Expr {

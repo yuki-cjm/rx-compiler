@@ -100,6 +100,109 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return buildExpression(operandContext);
     };
 
+    const auto applyDotSuffix = [this](
+                                    ExprPtr result,
+                                    Parser::DotSuffixContext *dotSuffix) {
+        std::string field;
+        if (dotSuffix->pathExprSegment() != nullptr) {
+            field = dotSuffix->pathExprSegment()->getText();
+        } else if (dotSuffix->identifier() != nullptr) {
+            field = dotSuffix->identifier()->getText();
+        } else {
+            unsupported(dotSuffix);
+        }
+
+        result = std::make_unique<FieldAccessExpr>(std::move(result),
+                                                   std::move(field));
+        if (auto *arguments = dotSuffix->callArguments()) {
+            std::vector<ExprPtr> builtArguments;
+            for (auto *argument : arguments->expression()) {
+                builtArguments.push_back(buildExpression(argument));
+            }
+            result = std::make_unique<CallExpr>(std::move(result),
+                                                std::move(builtArguments));
+        }
+        return result;
+    };
+
+    const auto applyPostfixSuffixes =
+        [this, &applyDotSuffix](
+            ExprPtr result,
+            const std::vector<Parser::PostfixSuffixContext *> &suffixes) {
+            for (auto *suffix : suffixes) {
+                if (auto *arguments = suffix->callArguments()) {
+                    std::vector<ExprPtr> builtArguments;
+                    for (auto *argument : arguments->expression()) {
+                        builtArguments.push_back(buildExpression(argument));
+                    }
+                    result = std::make_unique<CallExpr>(
+                        std::move(result), std::move(builtArguments));
+                } else if (suffix->LBRACKET() != nullptr) {
+                    if (suffix->expression() == nullptr) {
+                        unsupported(suffix);
+                    }
+                    result = std::make_unique<IndexExpr>(
+                        std::move(result),
+                        buildExpression(suffix->expression()));
+                } else if (suffix->dotSuffix() != nullptr) {
+                    result = applyDotSuffix(std::move(result),
+                                            suffix->dotSuffix());
+                } else {
+                    unsupported(suffix);
+                }
+            }
+            return result;
+        };
+
+    if (context->getRuleIndex() == Parser::RulePostfixExpression) {
+        auto *postfix = dynamic_cast<Parser::PostfixExpressionContext *>(context);
+        return applyPostfixSuffixes(buildExpression(postfix->primaryExpression()),
+                                    postfix->postfixSuffix());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleConditionPostfixExpression) {
+        auto *postfix =
+            dynamic_cast<Parser::ConditionPostfixExpressionContext *>(context);
+        return applyPostfixSuffixes(buildExpression(postfix->conditionPrimary()),
+                                    postfix->postfixSuffix());
+    }
+
+    if (context->getRuleIndex() ==
+        Parser::RuleConditionBreakPostfixExpression) {
+        auto *postfix =
+            dynamic_cast<Parser::ConditionBreakPostfixExpressionContext *>(
+                context);
+        return applyPostfixSuffixes(
+            buildExpression(postfix->conditionPrimaryWithoutBareBlock()),
+            postfix->postfixSuffix());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleStatementPostfixExpression) {
+        auto *postfix =
+            dynamic_cast<Parser::StatementPostfixExpressionContext *>(context);
+        if (postfix->expressionWithBlock() != nullptr) {
+            unsupported(postfix->expressionWithBlock());
+        }
+        return applyPostfixSuffixes(buildExpression(postfix->nonBlockPrimary()),
+                                    postfix->postfixSuffix());
+    }
+
+    if (context->getRuleIndex() == Parser::RulePrimaryExpression) {
+        auto *primary = dynamic_cast<Parser::PrimaryExpressionContext *>(context);
+        if (primary->expressionWithBlock() != nullptr) {
+            unsupported(primary->expressionWithBlock());
+        }
+        return buildExpression(primary->nonBlockPrimary());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleConditionPrimary) {
+        auto *primary = dynamic_cast<Parser::ConditionPrimaryContext *>(context);
+        if (primary->blockExpression() != nullptr) {
+            unsupported(primary->blockExpression());
+        }
+        return buildExpression(primary->conditionPrimaryWithoutBareBlock());
+    }
+
     if (context->getRuleIndex() == Parser::RuleUnaryExpression) {
         auto *unary = dynamic_cast<Parser::UnaryExpressionContext *>(context);
         if (unary->unaryOperator() != nullptr) {
@@ -136,6 +239,29 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             return buildUnary(unary->unaryOperator(), unary->unaryExpression());
         }
         return buildUnary(nullptr, unary->statementPostfixExpression());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleCastExpression ||
+        context->getRuleIndex() == Parser::RuleConditionCastExpression) {
+        ExprPtr result;
+        std::vector<Parser::TypeRefContext *> targetTypes;
+
+        if (context->getRuleIndex() == Parser::RuleCastExpression) {
+            auto *cast = dynamic_cast<Parser::CastExpressionContext *>(context);
+            result = buildExpression(cast->unaryExpression());
+            targetTypes = cast->typeRef();
+        } else {
+            auto *cast =
+                dynamic_cast<Parser::ConditionCastExpressionContext *>(context);
+            result = buildExpression(cast->conditionUnaryExpression());
+            targetTypes = cast->typeRef();
+        }
+
+        for (auto *targetType : targetTypes) {
+            result = std::make_unique<CastExpr>(
+                std::move(result), targetType->getText());
+        }
+        return result;
     }
 
     if (context->getRuleIndex() == Parser::RuleLiteralExpression) {
@@ -185,6 +311,23 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return result;
     }
 
+    if (context->getRuleIndex() ==
+        Parser::RuleConditionMultiplicativeExpression) {
+        auto *multiplicative =
+            dynamic_cast<Parser::ConditionMultiplicativeExpressionContext *>(
+                context);
+        const auto operands = multiplicative->conditionCastExpression();
+        const auto operators = multiplicative->multiplicativeOperator();
+
+        ExprPtr result = buildExpression(operands.front());
+        for (std::size_t i = 0; i < operators.size(); ++i) {
+            result = std::make_unique<BinaryExpr>(
+                binaryOpFromText(operators[i]->getText()), std::move(result),
+                buildExpression(operands[i + 1]));
+        }
+        return result;
+    }
+
     if (context->getRuleIndex() == Parser::RuleNonBlockPrimary ||
         context->getRuleIndex() ==
             Parser::RuleConditionPrimaryWithoutBareBlock) {
@@ -194,6 +337,12 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                 return std::make_unique<UnitExpr>();
             }
             return buildExpression(primary->expression());
+        }
+        if (primary != nullptr &&
+            (primary->arrayExpression() != nullptr ||
+             primary->LBRACE() != nullptr || primary->BREAK() != nullptr ||
+             primary->RETURN() != nullptr || primary->CONTINUE() != nullptr)) {
+            unsupported(context);
         }
 
         auto *conditionPrimary =
@@ -205,6 +354,16 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                 return std::make_unique<UnitExpr>();
             }
             return buildExpression(conditionPrimary->expression());
+        }
+        if (conditionPrimary != nullptr &&
+            (conditionPrimary->arrayExpression() != nullptr ||
+             conditionPrimary->ifExpression() != nullptr ||
+             conditionPrimary->LOOP() != nullptr ||
+             conditionPrimary->WHILE() != nullptr ||
+             conditionPrimary->BREAK() != nullptr ||
+             conditionPrimary->RETURN() != nullptr ||
+             conditionPrimary->CONTINUE() != nullptr)) {
+            unsupported(context);
         }
     }
 
@@ -418,7 +577,22 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         if (closedCast->unaryExpression() != nullptr) {
             return buildExpression(closedCast->unaryExpression());
         }
-        unsupported(context);
+        return std::make_unique<CastExpr>(
+            buildExpression(closedCast->castExpression()),
+            closedCast->closedCastType()->getText());
+    }
+
+    if (context->getRuleIndex() ==
+        Parser::RuleConditionClosedCastExpression) {
+        auto *closedCast =
+            dynamic_cast<Parser::ConditionClosedCastExpressionContext *>(
+                context);
+        if (closedCast->conditionUnaryExpression() != nullptr) {
+            return buildExpression(closedCast->conditionUnaryExpression());
+        }
+        return std::make_unique<CastExpr>(
+            buildExpression(closedCast->conditionCastExpression()),
+            closedCast->closedCastType()->getText());
     }
 
     if (context->getRuleIndex() == Parser::RuleShiftExpression ||
