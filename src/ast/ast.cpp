@@ -50,6 +50,15 @@ void PathExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+UnaryExpr::UnaryExpr(std::string op, ExprPtr operand)
+    : op(std::move(op)), operand(std::move(operand)) {}
+
+void UnaryExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Unary " << op << '\n';
+    operand->print(out, indent + 1);
+}
+
 BinaryExpr::BinaryExpr(std::string op, ExprPtr left, ExprPtr right)
     : op(std::move(op)), left(std::move(left)), right(std::move(right)) {}
 

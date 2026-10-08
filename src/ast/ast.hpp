@@ -96,6 +96,14 @@ struct PathExpr final : Expr {
     std::vector<std::string> segments;
 };
 
+struct UnaryExpr final : Expr {
+    UnaryExpr(std::string op, ExprPtr operand);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::string op;
+    ExprPtr operand;
+};
+
 struct BinaryExpr final : Expr {
     BinaryExpr(std::string op, ExprPtr left, ExprPtr right);
     void print(std::ostream &out, std::size_t indent) const override;

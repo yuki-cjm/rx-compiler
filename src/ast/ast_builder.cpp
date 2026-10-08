@@ -89,6 +89,53 @@ LetStatement AstBuilder::buildLet(Parser::LetStatementContext *context) const {
 }
 
 ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
+    const auto buildUnary = [this](antlr4::ParserRuleContext *operatorContext,
+                                   antlr4::ParserRuleContext *operandContext) {
+        if (operatorContext != nullptr) {
+            return ExprPtr(std::make_unique<UnaryExpr>(
+                operatorContext->getText(), buildExpression(operandContext)));
+        }
+        return buildExpression(operandContext);
+    };
+
+    if (context->getRuleIndex() == Parser::RuleUnaryExpression) {
+        auto *unary = dynamic_cast<Parser::UnaryExpressionContext *>(context);
+        if (unary->unaryOperator() != nullptr) {
+            return buildUnary(unary->unaryOperator(), unary->unaryExpression());
+        }
+        return buildUnary(nullptr, unary->postfixExpression());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleConditionUnaryExpression) {
+        auto *unary =
+            dynamic_cast<Parser::ConditionUnaryExpressionContext *>(context);
+        if (unary->unaryOperator() != nullptr) {
+            return buildUnary(unary->unaryOperator(),
+                              unary->conditionUnaryExpression());
+        }
+        return buildUnary(nullptr, unary->conditionPostfixExpression());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleConditionBreakUnaryExpression) {
+        auto *unary =
+            dynamic_cast<Parser::ConditionBreakUnaryExpressionContext *>(
+                context);
+        if (unary->unaryOperator() != nullptr) {
+            return buildUnary(unary->unaryOperator(),
+                              unary->conditionUnaryExpression());
+        }
+        return buildUnary(nullptr, unary->conditionBreakPostfixExpression());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleStatementUnaryExpression) {
+        auto *unary =
+            dynamic_cast<Parser::StatementUnaryExpressionContext *>(context);
+        if (unary->unaryOperator() != nullptr) {
+            return buildUnary(unary->unaryOperator(), unary->unaryExpression());
+        }
+        return buildUnary(nullptr, unary->statementPostfixExpression());
+    }
+
     if (context->getRuleIndex() == Parser::RuleLiteralExpression) {
         auto *literal =
             dynamic_cast<Parser::LiteralExpressionContext *>(context);
