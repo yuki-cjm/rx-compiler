@@ -147,34 +147,37 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RuleMultiplicativeExpression) {
-        auto *multiplicative = dynamic_cast<Parser::MultiplicativeExpressionContext *>(context);
+        auto *multiplicative =
+            dynamic_cast<Parser::MultiplicativeExpressionContext *>(context);
         const auto operands = multiplicative->castExpression();
         const auto operators = multiplicative->multiplicativeOperator();
 
         ExprPtr result = buildExpression(operands.front());
 
         for (std::size_t i = 0; i < operators.size(); i++) {
-            result = std::make_unique<BinaryExpr> (
-                operators[i]->getText(),
-                std::move(result),
-                buildExpression(operands[i + 1])
-            );
+            result = std::make_unique<BinaryExpr>(
+                operators[i]->getText(), std::move(result),
+                buildExpression(operands[i + 1]));
         }
 
         return result;
     }
 
-    if (context->getRuleIndex() == Parser::RuleStatementMultiplicativeExpression) {
-        auto *multiplicative = dynamic_cast<Parser::StatementMultiplicativeExpressionContext *>(context);
+    if (context->getRuleIndex() ==
+        Parser::RuleStatementMultiplicativeExpression) {
+        auto *multiplicative =
+            dynamic_cast<Parser::StatementMultiplicativeExpressionContext *>(
+                context);
         const auto operators = multiplicative->multiplicativeOperator();
 
-        ExprPtr result = buildExpression(multiplicative->statementCastExpression());
+        ExprPtr result =
+            buildExpression(multiplicative->statementCastExpression());
         const auto operands = multiplicative->castExpression();
 
         for (std::size_t i = 0; i < operators.size(); ++i) {
-            result = std::make_unique<BinaryExpr>(
-                operators[i]->getText(), std::move(result),
-                buildExpression(operands[i]));
+            result = std::make_unique<BinaryExpr>(operators[i]->getText(),
+                                                  std::move(result),
+                                                  buildExpression(operands[i]));
         }
 
         return result;
@@ -204,7 +207,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RulePathInExpression) {
-        auto *path = dynamic_cast<Parser::PathInExpressionContext*>(context);
+        auto *path = dynamic_cast<Parser::PathInExpressionContext *>(context);
 
         std::vector<std::string> segments;
         for (auto *segment : path->pathExprSegment()) {
@@ -241,6 +244,143 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
                 additive->additiveOperator(i - 1)->getText(), std::move(result),
                 buildExpression(operands[i]));
         }
+        return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleClosedAdditiveExpression) {
+        ExprPtr result;
+        std::string pendingOperator;
+
+        for (auto *child : context->children) {
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            if (rule->getRuleIndex() == Parser::RuleAdditiveOperator) {
+                pendingOperator = rule->getText();
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleMultiplicativeExpression ||
+                ruleIndex == Parser::RuleClosedMultiplicativeExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (pendingOperator.empty()) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        std::move(pendingOperator), std::move(result),
+                        std::move(operand));
+                    pendingOperator.clear();
+                }
+            }
+        }
+
+        if (!result || !pendingOperator.empty()) {
+            unsupported(context);
+        }
+        return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleClosedMultiplicativeExpression) {
+        ExprPtr result;
+        std::string pendingOperator;
+
+        for (auto *child : context->children) {
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            if (rule->getRuleIndex() == Parser::RuleMultiplicativeOperator) {
+                pendingOperator = rule->getText();
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleCastExpression ||
+                ruleIndex == Parser::RuleClosedCastExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (pendingOperator.empty()) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        std::move(pendingOperator), std::move(result),
+                        std::move(operand));
+                    pendingOperator.clear();
+                }
+            }
+        }
+
+        if (!result || !pendingOperator.empty()) {
+            unsupported(context);
+        }
+        return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleClosedCastExpression) {
+        auto *closedCast =
+            dynamic_cast<Parser::ClosedCastExpressionContext *>(context);
+        if (closedCast->unaryExpression() != nullptr) {
+            return buildExpression(closedCast->unaryExpression());
+        }
+        unsupported(context);
+    }
+
+    if (context->getRuleIndex() == Parser::RuleShiftExpression ||
+        context->getRuleIndex() == Parser::RuleClosedShiftExpression) {
+        ExprPtr result;
+        std::string pendingOperator;
+
+        for (auto *child : context->children) {
+            if (auto *terminal =
+                    dynamic_cast<antlr4::tree::TerminalNode *>(child)) {
+                if (terminal->getSymbol()->getType() == Parser::SHL) {
+                    pendingOperator = terminal->getText(); // <<
+                }
+                continue;
+            }
+
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            if (rule->getRuleIndex() == Parser::RuleShiftRight) {
+                pendingOperator = rule->getText(); // >>
+                continue;
+            }
+
+            if (rule->getRuleIndex() == Parser::RuleAdditiveExpression ||
+                rule->getRuleIndex() == Parser::RuleClosedAdditiveExpression) {
+                ExprPtr operand = buildExpression(rule);
+
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (pendingOperator.empty()) {
+                        unsupported(context);
+                    }
+
+                    result = std::make_unique<BinaryExpr>(
+                        std::move(pendingOperator), std::move(result),
+                        std::move(operand));
+                    pendingOperator.clear();
+                }
+            }
+        }
+
+        if (!result || !pendingOperator.empty()) {
+            unsupported(context);
+        }
+
         return result;
     }
 
