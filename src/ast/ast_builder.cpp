@@ -426,6 +426,21 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         return result;
     }
 
+    if (context->getRuleIndex() == Parser::RuleConditionAdditiveExpression) {
+        auto *additive =
+            dynamic_cast<Parser::ConditionAdditiveExpressionContext *>(context);
+        const auto operands = additive->conditionMultiplicativeExpression();
+        const auto operators = additive->additiveOperator();
+
+        ExprPtr result = buildExpression(operands.front());
+        for (std::size_t i = 0; i < operators.size(); ++i) {
+            result = std::make_unique<BinaryExpr>(
+                binaryOpFromText(operators[i]->getText()), std::move(result),
+                buildExpression(operands[i + 1]));
+        }
+        return result;
+    }
+
     if (context->getRuleIndex() == Parser::RuleClosedAdditiveExpression) {
         ExprPtr result;
         std::string pendingOperator;
@@ -444,6 +459,47 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             const auto ruleIndex = rule->getRuleIndex();
             if (ruleIndex == Parser::RuleMultiplicativeExpression ||
                 ruleIndex == Parser::RuleClosedMultiplicativeExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (pendingOperator.empty()) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        binaryOpFromText(pendingOperator), std::move(result),
+                        std::move(operand));
+                    pendingOperator.clear();
+                }
+            }
+        }
+
+        if (!result || !pendingOperator.empty()) {
+            unsupported(context);
+        }
+        return result;
+    }
+
+    if (context->getRuleIndex() ==
+        Parser::RuleConditionClosedAdditiveExpression) {
+        ExprPtr result;
+        std::string pendingOperator;
+
+        for (auto *child : context->children) {
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            if (rule->getRuleIndex() == Parser::RuleAdditiveOperator) {
+                pendingOperator = rule->getText();
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleConditionMultiplicativeExpression ||
+                ruleIndex ==
+                    Parser::RuleConditionClosedMultiplicativeExpression) {
                 ExprPtr operand = buildExpression(rule);
                 if (!result) {
                     result = std::move(operand);
@@ -526,6 +582,46 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             const auto ruleIndex = rule->getRuleIndex();
             if (ruleIndex == Parser::RuleCastExpression ||
                 ruleIndex == Parser::RuleClosedCastExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (pendingOperator.empty()) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        binaryOpFromText(pendingOperator), std::move(result),
+                        std::move(operand));
+                    pendingOperator.clear();
+                }
+            }
+        }
+
+        if (!result || !pendingOperator.empty()) {
+            unsupported(context);
+        }
+        return result;
+    }
+
+    if (context->getRuleIndex() ==
+        Parser::RuleConditionClosedMultiplicativeExpression) {
+        ExprPtr result;
+        std::string pendingOperator;
+
+        for (auto *child : context->children) {
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            if (rule->getRuleIndex() == Parser::RuleMultiplicativeOperator) {
+                pendingOperator = rule->getText();
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleConditionCastExpression ||
+                ruleIndex == Parser::RuleConditionClosedCastExpression) {
                 ExprPtr operand = buildExpression(rule);
                 if (!result) {
                     result = std::move(operand);
