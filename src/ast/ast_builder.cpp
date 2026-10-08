@@ -303,7 +303,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             }
 
             const auto ruleIndex = rule->getRuleIndex();
-            if (ruleIndex == Parser::RuleStatementClosedMultiplicativeExpression ||
+            if (ruleIndex ==
+                    Parser::RuleStatementClosedMultiplicativeExpression ||
                 ruleIndex == Parser::RuleStatementMultiplicativeExpression ||
                 ruleIndex == Parser::RuleMultiplicativeExpression ||
                 ruleIndex == Parser::RuleClosedMultiplicativeExpression) {
@@ -421,8 +422,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     if (context->getRuleIndex() == Parser::RuleShiftExpression ||
         context->getRuleIndex() == Parser::RuleClosedShiftExpression ||
         context->getRuleIndex() == Parser::RuleStatementShiftExpression ||
-        context->getRuleIndex() ==
-            Parser::RuleStatementClosedShiftExpression) {
+        context->getRuleIndex() == Parser::RuleStatementClosedShiftExpression) {
         ExprPtr result;
         std::string pendingOperator;
 
@@ -472,6 +472,55 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             unsupported(context);
         }
 
+        return result;
+    }
+
+    if (context->getRuleIndex() == Parser::RuleBitAndExpression ||
+        context->getRuleIndex() == Parser::RuleClosedBitAndExpression ||
+        context->getRuleIndex() == Parser::RuleStatementBitAndExpression ||
+        context->getRuleIndex() ==
+            Parser::RuleStatementClosedBitAndExpression) {
+        ExprPtr result;
+        bool pendingAnd = false;
+
+        for (auto *child : context->children) {
+            if (auto *terminal =
+                    dynamic_cast<antlr4::tree::TerminalNode *>(child)) {
+                if (terminal->getSymbol()->getType() != Parser::AMP ||
+                    !result || pendingAnd) {
+                    unsupported(context);
+                }
+                pendingAnd = true;
+                continue;
+            }
+
+            auto *rule = dynamic_cast<antlr4::ParserRuleContext *>(child);
+            if (rule == nullptr) {
+                continue;
+            }
+
+            const auto ruleIndex = rule->getRuleIndex();
+            if (ruleIndex == Parser::RuleShiftExpression ||
+                ruleIndex == Parser::RuleClosedShiftExpression ||
+                ruleIndex == Parser::RuleStatementShiftExpression ||
+                ruleIndex == Parser::RuleStatementClosedShiftExpression) {
+                ExprPtr operand = buildExpression(rule);
+                if (!result) {
+                    result = std::move(operand);
+                } else {
+                    if (!pendingAnd) {
+                        unsupported(context);
+                    }
+                    result = std::make_unique<BinaryExpr>(
+                        "&", std::move(result), std::move(operand));
+                    pendingAnd = false;
+                }
+            }
+        }
+
+        if (!result || pendingAnd) {
+            unsupported(context);
+        }
         return result;
     }
 
