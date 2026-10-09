@@ -451,9 +451,13 @@ void StructExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "StructExpr\n";
     path.print(out, indent + 1);
+    detail::printIndent(out, indent + 1);
+    out << "Fields {\n";
     for (const auto &field : fields) {
-        field.print(out, indent + 1);
+        field.print(out, indent + 2);
     }
+    detail::printIndent(out, indent + 1);
+    out << "}\n";
 }
 
 void Crate::print(std::ostream &out, std::size_t indent) const {
