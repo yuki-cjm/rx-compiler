@@ -5,87 +5,6 @@
 
 namespace rx::ast {
 
-LiteralExpr::LiteralExpr(std::string value) : value(std::move(value)) {}
-
-void LiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Literal " << value << '\n';
-}
-
-IntegerLiteralExpr::IntegerLiteralExpr(std::string value)
-    : value(std::move(value)) {}
-
-void IntegerLiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "IntegerLiteral " << value << '\n';
-}
-
-BooleanLiteralExpr::BooleanLiteralExpr(bool value) : value(value) {}
-
-void BooleanLiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "BooleanLiteral " << (value ? "true" : "false") << '\n';
-}
-
-void UnitExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Unit\n";
-}
-
-NameExpr::NameExpr(std::string name) : name(std::move(name)) {}
-
-void NameExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Name " << name << '\n';
-}
-
-PathExpr::PathExpr(std::vector<std::string> segments)
-    : segments(std::move(segments)) {}
-
-void PathExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Path\n";
-    for (const auto &segment : segments) {
-        detail::printIndent(out, indent + 1);
-        out << "Segment " << segment << '\n';
-    }
-}
-
-CallExpr::CallExpr(ExprPtr callee, std::vector<ExprPtr> arguments)
-    : callee(std::move(callee)), arguments(std::move(arguments)) {}
-
-void CallExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Call\n";
-    detail::printIndent(out, indent + 1);
-    out << "Callee\n";
-    callee->print(out, indent + 2);
-    detail::printIndent(out, indent + 1);
-    out << "Arguments\n";
-    for (const auto &argument : arguments) {
-        argument->print(out, indent + 2);
-    }
-}
-
-IndexExpr::IndexExpr(ExprPtr operand, ExprPtr index)
-    : operand(std::move(operand)), index(std::move(index)) {}
-
-void IndexExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Index\n";
-    operand->print(out, indent + 1);
-    index->print(out, indent + 1);
-}
-
-FieldAccessExpr::FieldAccessExpr(ExprPtr operand, std::string field)
-    : operand(std::move(operand)), field(std::move(field)) {}
-
-void FieldAccessExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "FieldAccess " << field << '\n';
-    operand->print(out, indent + 1);
-}
-
 namespace {
 
 void invalidOperator() { throw std::logic_error("invalid AST operator"); }
@@ -293,6 +212,114 @@ BinaryOp binaryOpFromText(std::string_view text) {
                                 std::string(text));
 }
 
+std::string_view deriveTraitText(DeriveTrait trait) {
+    switch (trait) {
+    case rx::ast::DeriveTrait::Clone:
+        return "Clone";
+    case rx::ast::DeriveTrait::PartialEq:
+        return "PartialEq";
+    case rx::ast::DeriveTrait::Eq:
+        return "Eq";
+    case rx::ast::DeriveTrait::Copy:
+        return "Copy";
+    }
+    invalidOperator();
+}
+
+DeriveTrait deriveTraitFromText(std::string_view text) {
+    if (text == "Copy") {
+        return rx::ast::DeriveTrait::Copy;
+    } else if (text == "Clone") {
+        return rx::ast::DeriveTrait::Clone;
+    } else if (text == "PartialEq") {
+        return rx::ast::DeriveTrait::PartialEq;
+    } else if (text == "Eq") {
+        return rx::ast::DeriveTrait::Eq;
+    }
+    throw std::invalid_argument("unknown derive trait: " + std::string(text));
+}
+
+LiteralExpr::LiteralExpr(std::string value) : value(std::move(value)) {}
+
+void LiteralExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Literal " << value << '\n';
+}
+
+IntegerLiteralExpr::IntegerLiteralExpr(std::string value)
+    : value(std::move(value)) {}
+
+void IntegerLiteralExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "IntegerLiteral " << value << '\n';
+}
+
+BooleanLiteralExpr::BooleanLiteralExpr(bool value) : value(value) {}
+
+void BooleanLiteralExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "BooleanLiteral " << (value ? "true" : "false") << '\n';
+}
+
+void UnitExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Unit\n";
+}
+
+NameExpr::NameExpr(std::string name) : name(std::move(name)) {}
+
+void NameExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Name " << name << '\n';
+}
+
+PathExpr::PathExpr(std::vector<std::string> segments)
+    : segments(std::move(segments)) {}
+
+void PathExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Path\n";
+    for (const auto &segment : segments) {
+        detail::printIndent(out, indent + 1);
+        out << "Segment " << segment << '\n';
+    }
+}
+
+CallExpr::CallExpr(ExprPtr callee, std::vector<ExprPtr> arguments)
+    : callee(std::move(callee)), arguments(std::move(arguments)) {}
+
+void CallExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Call\n";
+    detail::printIndent(out, indent + 1);
+    out << "Callee\n";
+    callee->print(out, indent + 2);
+    detail::printIndent(out, indent + 1);
+    out << "Arguments\n";
+    for (const auto &argument : arguments) {
+        argument->print(out, indent + 2);
+    }
+}
+
+IndexExpr::IndexExpr(ExprPtr operand, ExprPtr index)
+    : operand(std::move(operand)), index(std::move(index)) {}
+
+void IndexExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Index\n";
+    operand->print(out, indent + 1);
+    index->print(out, indent + 1);
+}
+
+FieldAccessExpr::FieldAccessExpr(ExprPtr operand, std::string field)
+    : operand(std::move(operand)), field(std::move(field)) {}
+
+void FieldAccessExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "FieldAccess " << field << '\n';
+    operand->print(out, indent + 1);
+}
+
 UnaryExpr::UnaryExpr(UnaryOp op, ExprPtr operand)
     : op(op), operand(std::move(operand)) {}
 
@@ -460,6 +487,47 @@ void StructExpr::print(std::ostream &out, std::size_t indent) const {
     out << "}\n";
 }
 
+StructField::StructField(std::string name, std::string type)
+    : name(std::move(name)), type(std::move(type)) {}
+
+void StructField::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << name << ": " << type << '\n';
+}
+
+void LifetimeParam::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "LifetimeParam " << lifetime << '\n';
+    if (lifetimeBounds) {
+        detail::printIndent(out, indent + 1);
+        out << "Bounds";
+        for (const auto &bound : *lifetimeBounds) {
+            out << ' ' << bound;
+        }
+        out << '\n';
+    }
+}
+
+void GenericParam::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "GenericParams\n";
+    for (const auto &parameter : params) {
+        parameter.print(out, indent + 1);
+    }
+}
+
+void StructItem::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Struct " << name;
+    out << '\n';
+    if (genericParams) {
+        genericParams->print(out, indent + 1);
+    }
+    for (auto field : fields) {
+        field.print(out, indent + 1);
+    }
+}
+
 void Crate::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Crate\n";
@@ -476,12 +544,27 @@ void Function::print(std::ostream &out, std::size_t indent) const {
     }
     out << '\n';
 
+    if (genericParams) {
+        genericParams->print(out, indent + 1);
+    }
     for (const auto &parameter : parameters) {
         detail::printIndent(out, indent + 1);
         out << "Parameter " << parameter.name << ": " << parameter.type << '\n';
     }
 
     body.print(out, indent + 1);
+}
+
+DeriveAttribute::DeriveAttribute(std::vector<DeriveTrait> traits)
+    : traits(std::move(traits)) {}
+
+void DeriveAttribute::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "DeriveAttribute\n";
+    for (const auto &trait : traits) {
+        detail::printIndent(out, indent + 1);
+        out << "Trait " << deriveTraitText(trait) << '\n';
+    }
 }
 
 void Program::print(std::ostream &out) const {

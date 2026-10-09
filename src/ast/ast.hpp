@@ -53,10 +53,19 @@ enum class BinaryOp {
     ShiftRightAssign,
 };
 
+enum class DeriveTrait {
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+};
+
 std::string_view unaryOpText(UnaryOp op);
 UnaryOp unaryOpFromText(std::string_view text);
 std::string_view binaryOpText(BinaryOp op);
 BinaryOp binaryOpFromText(std::string_view text);
+std::string_view deriveTraitText(DeriveTrait trait);
+DeriveTrait deriveTraitFromText(std::string_view text);
 
 class ASTNode {
   public:
@@ -217,6 +226,19 @@ struct Parameter {
     std::string type;
 };
 
+struct LifetimeParam {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::string lifetime;
+    std::optional<std::vector<std::string>> lifetimeBounds;
+};
+
+struct GenericParam {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::vector<LifetimeParam> params;
+};
+
 struct BlockExpr final : Expr {
     explicit BlockExpr(std::vector<StmtPtr> statements = {}, ExprPtr tail = {});
     void print(std::ostream &out, std::size_t indent) const override;
@@ -285,13 +307,37 @@ struct StructExpr final : Expr {
     std::vector<StructExprField> fields;
 };
 
-struct Function final : Item {
+struct StructField {
+    StructField(std::string name, std::string type);
+    void print(std::ostream &out, std::size_t indent) const;
+
     std::string name;
+    std::string type;
+};
+
+struct Function final : Item {
+    void print(std::ostream &out, std::size_t indent = 0) const override;
+
+    std::string name;
+    std::optional<GenericParam> genericParams;
     std::vector<Parameter> parameters;
     std::optional<std::string> returnType;
     BlockExpr body;
+};
 
+struct StructItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
+
+    std::string name;
+    std::optional<GenericParam> genericParams;
+    std::vector<StructField> fields;
+};
+
+struct DeriveAttribute {
+    DeriveAttribute(std::vector<DeriveTrait> traits);
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::vector<DeriveTrait> traits;
 };
 
 struct Program {

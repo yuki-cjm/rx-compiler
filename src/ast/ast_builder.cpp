@@ -30,12 +30,11 @@ ruleChildren(antlr4::ParserRuleContext *context) {
 Program AstBuilder::build(Parser::CrateContext *crate) const {
     Program program;
     for (auto *item : crate->item()) {
-        auto *function = item->functionDefinition();
-        if (function == nullptr) {
-            unsupported(item);
+        if (item->functionDefinition() != nullptr) {
+            program.items.push_back(std::make_unique<Function>(buildFunction(item->functionDefinition())));
+        } else if (item->structDefinition() != nullptr) {
+            program.items.push_back(std::make_unique<StructItem>(buildStruct(item->structDefinition())));
         }
-        program.items.push_back(
-            std::make_unique<Function>(buildFunction(function)));
     }
     return program;
 }
@@ -44,6 +43,9 @@ Function
 AstBuilder::buildFunction(Parser::FunctionDefinitionContext *context) const {
     Function function;
     function.name = context->identifier()->getText();
+    if (auto *genericParams = context->genericParams()) {
+        function.genericParams = buildGenericParams(genericParams);
+    }
 
     if (auto *returnType = context->typeRef()) {
         function.returnType = returnType->getText();
@@ -62,6 +64,33 @@ AstBuilder::buildFunction(Parser::FunctionDefinitionContext *context) const {
 
     function.body = buildBlock(context->blockExpression());
     return function;
+}
+
+GenericParam
+AstBuilder::buildGenericParams(Parser::GenericParamsContext *context) const {
+    GenericParam genericParams;
+    genericParams.params.reserve(context->lifetimeParam().size());
+
+    for (auto *lifetimeParam : context->lifetimeParam()) {
+        LifetimeParam parameter;
+        parameter.lifetime = lifetimeParam->lifetime()->getText();
+        if (auto *bounds = lifetimeParam->lifetimeBounds()) {
+            std::vector<std::string> boundNames;
+            boundNames.reserve(bounds->lifetime().size());
+            for (auto *bound : bounds->lifetime()) {
+                boundNames.push_back(bound->getText());
+            }
+            parameter.lifetimeBounds = std::move(boundNames);
+        }
+        genericParams.params.push_back(std::move(parameter));
+    }
+
+    return genericParams;
+}
+
+StructItem
+AstBuilder::buildStruct(Parser::StructDefinitionContext *context) const {
+    unsupported(context);
 }
 
 BlockExpr
