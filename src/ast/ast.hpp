@@ -267,6 +267,24 @@ struct ContinueExpr final : Expr {
     void print(std::ostream &out, std::size_t indent) const override;
 };
 
+struct StructExprField {
+    StructExprField(std::string name, ExprPtr value);
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::string name;
+    ExprPtr value;
+};
+
+struct StructExpr final : Expr {
+    StructExpr(PathExpr path,
+               std::vector<StructExprField> fields);
+
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    PathExpr path;
+    std::vector<StructExprField> fields;
+};
+
 struct Function {
     std::string name;
     std::vector<Parameter> parameters;

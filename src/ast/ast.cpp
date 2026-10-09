@@ -435,6 +435,27 @@ void ExprStmt::print(std::ostream &out, std::size_t indent) const {
     expression->print(out, indent + 1);
 }
 
+StructExprField::StructExprField(std::string name, ExprPtr value)
+    : name(std::move(name)), value(std::move(value)) {}
+
+void StructExprField::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "StructExprField " << name << '\n';
+    value->print(out, indent + 1);
+}
+
+StructExpr::StructExpr(PathExpr path, std::vector<StructExprField> fields)
+    : path(std::move(path)), fields(std::move(fields)) {}
+
+void StructExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "StructExpr\n";
+    path.print(out, indent + 1);
+    for (const auto &field : fields) {
+        field.print(out, indent + 1);
+    }
+}
+
 void Crate::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Crate\n";

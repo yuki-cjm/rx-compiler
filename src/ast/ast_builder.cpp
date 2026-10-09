@@ -105,11 +105,16 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
 }
 
 ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
+    const auto buildPath = [](Parser::PathInExpressionContext *path) {
+        std::vector<std::string> segments;
+        for (auto *segment : path->pathExprSegment()) {
+            segments.push_back(segment->getText());
+        }
+        return PathExpr(std::move(segments));
+    };
+
     const auto buildExpressionWithBlock =
         [this](Parser::ExpressionWithBlockContext *expression) -> ExprPtr {
-        if (expression->blockExpression() != nullptr) {
-            return buildExpression(expression->blockExpression());
-        }
         if (expression->ifExpression() != nullptr) {
             return buildExpression(expression->ifExpression());
         }
@@ -128,6 +133,9 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             return std::make_unique<WhileExpr>(
                 buildExpression(expression->conditionExpression()),
                 buildBlock(expression->blockExpression()));
+        }
+        if (expression->blockExpression() != nullptr) {
+            return buildExpression(expression->blockExpression());
         }
         unsupported(expression);
     };
@@ -395,6 +403,23 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         context->getRuleIndex() ==
             Parser::RuleConditionPrimaryWithoutBareBlock) {
         auto *primary = dynamic_cast<Parser::NonBlockPrimaryContext *>(context);
+        if (primary != nullptr && primary->pathInExpression() != nullptr) {
+            PathExpr path = buildPath(primary->pathInExpression());
+            if (primary->LBRACE() == nullptr) {
+                return std::make_unique<PathExpr>(std::move(path));
+            }
+
+            std::vector<StructExprField> fields;
+            if (auto *structFields = primary->structExprFields()) {
+                fields.reserve(structFields->structExprField().size());
+                for (auto *field : structFields->structExprField()) {
+                    fields.emplace_back(field->identifier()->getText(),
+                                        buildExpression(field->expression()));
+                }
+            }
+            return std::make_unique<StructExpr>(std::move(path),
+                                                std::move(fields));
+        }
         if (primary != nullptr && primary->LPAREN() != nullptr) {
             if (primary->expression() == nullptr) {
                 return std::make_unique<UnitExpr>();
@@ -484,12 +509,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
 
     if (context->getRuleIndex() == Parser::RulePathInExpression) {
         auto *path = dynamic_cast<Parser::PathInExpressionContext *>(context);
-
-        std::vector<std::string> segments;
-        for (auto *segment : path->pathExprSegment()) {
-            segments.push_back(segment->getText());
-        }
-        return std::make_unique<PathExpr>(std::move(segments));
+        return std::make_unique<PathExpr>(buildPath(path));
     }
 
     if (context->getRuleIndex() == Parser::RuleAdditiveExpression) {
