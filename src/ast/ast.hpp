@@ -285,15 +285,17 @@ struct StructExpr final : Expr {
     std::vector<StructExprField> fields;
 };
 
-struct Function {
+struct Function final : Item {
     std::string name;
     std::vector<Parameter> parameters;
     std::optional<std::string> returnType;
     BlockExpr body;
+
+    void print(std::ostream &out, std::size_t indent = 0) const override;
 };
 
 struct Program {
-    std::vector<Function> functions;
+    std::vector<ItemPtr> items;
 
     void print(std::ostream &out) const;
 };

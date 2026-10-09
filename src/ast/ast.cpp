@@ -468,21 +468,26 @@ void Crate::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+void Function::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Function " << name;
+    if (returnType) {
+        out << " -> " << *returnType;
+    }
+    out << '\n';
+
+    for (const auto &parameter : parameters) {
+        detail::printIndent(out, indent + 1);
+        out << "Parameter " << parameter.name << ": " << parameter.type << '\n';
+    }
+
+    body.print(out, indent + 1);
+}
+
 void Program::print(std::ostream &out) const {
     out << "Program\n";
-    for (const auto &function : functions) {
-        out << "  Function " << function.name;
-        if (function.returnType) {
-            out << " -> " << *function.returnType;
-        }
-        out << '\n';
-
-        for (const auto &parameter : function.parameters) {
-            out << "    Parameter " << parameter.name << ": " << parameter.type
-                << '\n';
-        }
-
-        function.body.print(out, 2);
+    for (const auto &item : items) {
+        item->print(out, 1);
     }
 }
 

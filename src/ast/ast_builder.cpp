@@ -34,7 +34,8 @@ Program AstBuilder::build(Parser::CrateContext *crate) const {
         if (function == nullptr) {
             unsupported(item);
         }
-        program.functions.push_back(buildFunction(function));
+        program.items.push_back(
+            std::make_unique<Function>(buildFunction(function)));
     }
     return program;
 }
