@@ -89,16 +89,8 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     }
 
     if (auto *expressionWithBlock = context->expressionWithBlock()) {
-        ExprPtr expression;
-        if (expressionWithBlock->blockExpression() != nullptr) {
-            expression =
-                buildExpression(expressionWithBlock->blockExpression());
-        } else if (expressionWithBlock->ifExpression() != nullptr) {
-            expression = buildExpression(expressionWithBlock->ifExpression());
-        } else {
-            unsupported(expressionWithBlock);
-        }
-        return std::make_unique<ExprStmt>(std::move(expression));
+        return std::make_unique<ExprStmt>(
+            buildExpression(expressionWithBlock));
     }
 
     if (auto *expression = context->statementExpression()) {
@@ -113,6 +105,33 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
 }
 
 ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
+    const auto buildExpressionWithBlock =
+        [this](Parser::ExpressionWithBlockContext *expression) -> ExprPtr {
+        if (expression->blockExpression() != nullptr) {
+            return buildExpression(expression->blockExpression());
+        }
+        if (expression->ifExpression() != nullptr) {
+            return buildExpression(expression->ifExpression());
+        }
+        if (expression->LOOP() != nullptr) {
+            if (expression->blockExpression() == nullptr) {
+                unsupported(expression);
+            }
+            return std::make_unique<LoopExpr>(
+                buildBlock(expression->blockExpression()));
+        }
+        if (expression->WHILE() != nullptr) {
+            if (expression->conditionExpression() == nullptr ||
+                expression->blockExpression() == nullptr) {
+                unsupported(expression);
+            }
+            return std::make_unique<WhileExpr>(
+                buildExpression(expression->conditionExpression()),
+                buildBlock(expression->blockExpression()));
+        }
+        unsupported(expression);
+    };
+
     const auto buildUnary = [this](antlr4::ParserRuleContext *operatorContext,
                                    antlr4::ParserRuleContext *operandContext) {
         if (operatorContext != nullptr) {
@@ -210,15 +229,7 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             if (postfix->dotSuffix() == nullptr) {
                 unsupported(expressionWithBlock);
             }
-            ExprPtr result;
-            if (expressionWithBlock->blockExpression() != nullptr) {
-                result =
-                    buildExpression(expressionWithBlock->blockExpression());
-            } else if (expressionWithBlock->ifExpression() != nullptr) {
-                result = buildExpression(expressionWithBlock->ifExpression());
-            } else {
-                unsupported(expressionWithBlock);
-            }
+            ExprPtr result = buildExpression(expressionWithBlock);
             result = applyDotSuffix(std::move(result), postfix->dotSuffix());
             return applyPostfixSuffixes(std::move(result),
                                         postfix->postfixSuffix());
@@ -231,16 +242,14 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         auto *primary =
             dynamic_cast<Parser::PrimaryExpressionContext *>(context);
         if (primary->expressionWithBlock() != nullptr) {
-            auto *expressionWithBlock = primary->expressionWithBlock();
-            if (expressionWithBlock->blockExpression() != nullptr) {
-                return buildExpression(expressionWithBlock->blockExpression());
-            }
-            if (expressionWithBlock->ifExpression() != nullptr) {
-                return buildExpression(expressionWithBlock->ifExpression());
-            }
-            unsupported(expressionWithBlock);
+            return buildExpression(primary->expressionWithBlock());
         }
         return buildExpression(primary->nonBlockPrimary());
+    }
+
+    if (context->getRuleIndex() == Parser::RuleExpressionWithBlock) {
+        return buildExpressionWithBlock(
+            dynamic_cast<Parser::ExpressionWithBlockContext *>(context));
     }
 
     if (context->getRuleIndex() == Parser::RuleConditionPrimary) {
@@ -392,10 +401,27 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             }
             return buildExpression(primary->expression());
         }
-        if (primary != nullptr &&
-            (primary->LBRACE() != nullptr || primary->BREAK() != nullptr ||
-             primary->RETURN() != nullptr || primary->CONTINUE() != nullptr)) {
-            unsupported(context);
+        if (primary != nullptr) {
+            if (primary->BREAK() != nullptr) {
+                ExprPtr value;
+                if (primary->expression() != nullptr) {
+                    value = buildExpression(primary->expression());
+                }
+                return std::make_unique<BreakExpr>(std::move(value));
+            }
+            if (primary->RETURN() != nullptr) {
+                ExprPtr value;
+                if (primary->expression() != nullptr) {
+                    value = buildExpression(primary->expression());
+                }
+                return std::make_unique<ReturnExpr>(std::move(value));
+            }
+            if (primary->CONTINUE() != nullptr) {
+                return std::make_unique<ContinueExpr>();
+            }
+            if (primary->LBRACE() != nullptr) {
+                unsupported(context);
+            }
         }
 
         auto *conditionPrimary =
@@ -418,7 +444,41 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             if (conditionPrimary->ifExpression() != nullptr) {
                 return buildExpression(conditionPrimary->ifExpression());
             }
-            unsupported(context);
+            if (conditionPrimary->LOOP() != nullptr) {
+                if (conditionPrimary->blockExpression() == nullptr) {
+                    unsupported(context);
+                }
+                return std::make_unique<LoopExpr>(
+                    buildBlock(conditionPrimary->blockExpression()));
+            }
+            if (conditionPrimary->WHILE() != nullptr) {
+                if (conditionPrimary->conditionExpression() == nullptr ||
+                    conditionPrimary->blockExpression() == nullptr) {
+                    unsupported(context);
+                }
+                return std::make_unique<WhileExpr>(
+                    buildExpression(conditionPrimary->conditionExpression()),
+                    buildBlock(conditionPrimary->blockExpression()));
+            }
+            if (conditionPrimary->BREAK() != nullptr) {
+                ExprPtr value;
+                if (conditionPrimary->conditionBreakExpression() != nullptr) {
+                    value = buildExpression(
+                        conditionPrimary->conditionBreakExpression());
+                }
+                return std::make_unique<BreakExpr>(std::move(value));
+            }
+            if (conditionPrimary->RETURN() != nullptr) {
+                ExprPtr value;
+                if (conditionPrimary->conditionExpression() != nullptr) {
+                    value = buildExpression(
+                        conditionPrimary->conditionExpression());
+                }
+                return std::make_unique<ReturnExpr>(std::move(value));
+            }
+            if (conditionPrimary->CONTINUE() != nullptr) {
+                return std::make_unique<ContinueExpr>();
+            }
         }
     }
 

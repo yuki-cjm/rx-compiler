@@ -379,6 +379,49 @@ void IfExpr::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+LoopExpr::LoopExpr(BlockExpr body) : body(std::move(body)) {}
+
+void LoopExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Loop\n";
+    body.print(out, indent + 1);
+}
+
+WhileExpr::WhileExpr(ExprPtr condition, BlockExpr body)
+    : condition(std::move(condition)), body(std::move(body)) {}
+
+void WhileExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "While\n";
+    condition->print(out, indent + 1);
+    body.print(out, indent + 1);
+}
+
+BreakExpr::BreakExpr(ExprPtr value) : value(std::move(value)) {}
+
+void BreakExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Break\n";
+    if (value) {
+        value->print(out, indent + 1);
+    }
+}
+
+ReturnExpr::ReturnExpr(ExprPtr value) : value(std::move(value)) {}
+
+void ReturnExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Return\n";
+    if (value) {
+        value->print(out, indent + 1);
+    }
+}
+
+void ContinueExpr::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Continue\n";
+}
+
 void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "EmptyStmt\n";

@@ -178,7 +178,6 @@ struct FieldAccessExpr final : Expr {
     std::string field;
 };
 
-
 struct UnaryExpr final : Expr {
     UnaryExpr(UnaryOp op, ExprPtr operand);
     void print(std::ostream &out, std::size_t indent) const override;
@@ -233,6 +232,39 @@ struct IfExpr final : Expr {
     ExprPtr condition;
     BlockExpr thenBranch;
     ExprPtr elseBranch;
+};
+
+struct LoopExpr final : Expr {
+    LoopExpr(BlockExpr body);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    BlockExpr body;
+};
+
+struct WhileExpr final : Expr {
+    WhileExpr(ExprPtr condition, BlockExpr body);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr condition;
+    BlockExpr body;
+};
+
+struct BreakExpr final : Expr {
+    BreakExpr(ExprPtr value);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr value;
+};
+
+struct ReturnExpr final : Expr {
+    ReturnExpr(ExprPtr value);
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    ExprPtr value;
+};
+
+struct ContinueExpr final : Expr {
+    void print(std::ostream &out, std::size_t indent) const override;
 };
 
 struct Function {
