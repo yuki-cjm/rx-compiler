@@ -89,8 +89,7 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     }
 
     if (auto *expressionWithBlock = context->expressionWithBlock()) {
-        return std::make_unique<ExprStmt>(
-            buildExpression(expressionWithBlock));
+        return std::make_unique<ExprStmt>(buildExpression(expressionWithBlock));
     }
 
     if (auto *expression = context->statementExpression()) {
@@ -313,7 +312,8 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
     }
 
     if (context->getRuleIndex() == Parser::RuleCastExpression ||
-        context->getRuleIndex() == Parser::RuleConditionCastExpression) {
+        context->getRuleIndex() == Parser::RuleConditionCastExpression ||
+        context->getRuleIndex() == Parser::RuleStatementCastExpression) {
         ExprPtr result;
         std::vector<Parser::TypeRefContext *> targetTypes;
 
@@ -321,10 +321,16 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
             auto *cast = dynamic_cast<Parser::CastExpressionContext *>(context);
             result = buildExpression(cast->unaryExpression());
             targetTypes = cast->typeRef();
-        } else {
+        } else if (context->getRuleIndex() ==
+                   Parser::RuleConditionCastExpression) {
             auto *cast =
                 dynamic_cast<Parser::ConditionCastExpressionContext *>(context);
             result = buildExpression(cast->conditionUnaryExpression());
+            targetTypes = cast->typeRef();
+        } else {
+            auto *cast =
+                dynamic_cast<Parser::StatementCastExpressionContext *>(context);
+            result = buildExpression(cast->statementUnaryExpression());
             targetTypes = cast->typeRef();
         }
 
@@ -822,6 +828,23 @@ ExprPtr AstBuilder::buildExpression(antlr4::ParserRuleContext *context) const {
         }
         return std::make_unique<CastExpr>(
             buildExpression(closedCast->conditionCastExpression()),
+            closedCast->closedCastType()->getText());
+    }
+
+    if (context->getRuleIndex() ==
+        Parser::RuleStatementClosedCastExpression) {
+        auto *closedCast =
+            dynamic_cast<Parser::StatementClosedCastExpressionContext *>(
+                context);
+        if (closedCast->statementUnaryExpression() != nullptr) {
+            return buildExpression(closedCast->statementUnaryExpression());
+        }
+        if (closedCast->statementCastExpression() == nullptr ||
+            closedCast->closedCastType() == nullptr) {
+            unsupported(context);
+        }
+        return std::make_unique<CastExpr>(
+            buildExpression(closedCast->statementCastExpression()),
             closedCast->closedCastType()->getText());
     }
 
