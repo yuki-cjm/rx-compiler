@@ -90,7 +90,28 @@ AstBuilder::buildGenericParams(Parser::GenericParamsContext *context) const {
 
 StructItem
 AstBuilder::buildStruct(Parser::StructDefinitionContext *context) const {
-    unsupported(context);
+    StructItem item;
+    item.name = context->identifier()->getText();
+
+    if (auto *genericParams = context->genericParams()) {
+        item.genericParams = buildGenericParams(genericParams);
+    }
+
+    for (auto *attribute : context->outerAttribute()) {
+        std::vector<DeriveTrait> traits;
+        traits.reserve(attribute->deriveName().size());
+        for (auto *deriveName : attribute->deriveName()) {
+            traits.push_back(deriveTraitFromText(deriveName->getText()));
+        }
+        item.attributes.emplace_back(std::move(traits));
+    }
+
+    for (auto *field : context->structField()) {
+        item.fields.emplace_back(field->identifier()->getText(),
+                                 field->typeRef()->getText());
+    }
+
+    return item;
 }
 
 BlockExpr

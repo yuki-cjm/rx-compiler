@@ -325,19 +325,20 @@ struct Function final : Item {
     BlockExpr body;
 };
 
-struct StructItem final : Item {
-    void print(std::ostream &out, std::size_t indent = 0) const override;
-
-    std::string name;
-    std::optional<GenericParam> genericParams;
-    std::vector<StructField> fields;
-};
-
 struct DeriveAttribute {
     DeriveAttribute(std::vector<DeriveTrait> traits);
     void print(std::ostream &out, std::size_t indent) const;
 
     std::vector<DeriveTrait> traits;
+};
+
+struct StructItem final : Item {
+    void print(std::ostream &out, std::size_t indent = 0) const override;
+
+    std::string name;
+    std::optional<GenericParam> genericParams;
+    std::vector<DeriveAttribute> attributes;
+    std::vector<StructField> fields;
 };
 
 struct Program {

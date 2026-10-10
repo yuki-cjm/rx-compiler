@@ -523,7 +523,10 @@ void StructItem::print(std::ostream &out, std::size_t indent) const {
     if (genericParams) {
         genericParams->print(out, indent + 1);
     }
-    for (auto field : fields) {
+    for (const auto &attribute : attributes) {
+        attribute.print(out, indent + 1);
+    }
+    for (const auto &field : fields) {
         field.print(out, indent + 1);
     }
 }
