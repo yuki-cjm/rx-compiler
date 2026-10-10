@@ -34,6 +34,8 @@ Program AstBuilder::build(Parser::CrateContext *crate) const {
             program.items.push_back(std::make_unique<Function>(buildFunction(item->functionDefinition())));
         } else if (item->structDefinition() != nullptr) {
             program.items.push_back(std::make_unique<StructItem>(buildStruct(item->structDefinition())));
+        } else if (item->constantItem() != nullptr) {
+            program.items.push_back(std::make_unique<ConstantItem>(buildConstant(item->constantItem())));
         }
     }
     return program;
@@ -52,14 +54,24 @@ AstBuilder::buildFunction(Parser::FunctionDefinitionContext *context) const {
     }
 
     if (auto *parameters = context->functionParameters()) {
-        if (parameters->selfParam() != nullptr) {
-            unsupported(parameters->selfParam());
+        if (auto *selfParam = parameters->selfParam()) {
+            SelfParam self;
+            self.isBorrowed = selfParam->AMP() != nullptr;
+            self.isMutable = selfParam->MUT() != nullptr;
+            if (auto *lifetime = selfParam->lifetime()) {
+                self.lifetime = lifetime->getText();
+            }
+            function.selfParam = std::move(self);
         }
         for (auto *parameter : parameters->functionParam()) {
             function.parameters.push_back(
                 {parameter->identifierBinding()->getText(),
                  parameter->typeRef()->getText()});
         }
+    }
+
+    if (auto *whereClause = context->whereClause()) {
+        function.whereClause = buildWhereClause(whereClause);
     }
 
     function.body = buildBlock(context->blockExpression());
@@ -88,6 +100,38 @@ AstBuilder::buildGenericParams(Parser::GenericParamsContext *context) const {
     return genericParams;
 }
 
+WhereClause
+AstBuilder::buildWhereClause(Parser::WhereClauseContext *context) const {
+    WhereClause clause;
+    clause.items.reserve(context->whereClauseItem().size());
+
+    for (auto *itemContext : context->whereClauseItem()) {
+        WhereClauseItem item;
+        if (auto *lifetime = itemContext->lifetime()) {
+            item.lifetime = lifetime->getText();
+            if (auto *bounds = itemContext->lifetimeBounds()) {
+                item.bounds.reserve(bounds->lifetime().size());
+                for (auto *bound : bounds->lifetime()) {
+                    item.bounds.push_back(bound->getText());
+                }
+            }
+        } else if (auto *type = itemContext->typeRef()) {
+            item.type = type->getText();
+            if (auto *bounds = itemContext->typeParamBounds()) {
+                item.bounds.reserve(bounds->lifetime().size());
+                for (auto *bound : bounds->lifetime()) {
+                    item.bounds.push_back(bound->getText());
+                }
+            }
+        } else {
+            unsupported(itemContext);
+        }
+        clause.items.push_back(std::move(item));
+    }
+
+    return clause;
+}
+
 StructItem
 AstBuilder::buildStruct(Parser::StructDefinitionContext *context) const {
     StructItem item;
@@ -111,7 +155,68 @@ AstBuilder::buildStruct(Parser::StructDefinitionContext *context) const {
                                  field->typeRef()->getText());
     }
 
+    if (auto *whereClause = context->whereClause()) {
+        item.whereClause = buildWhereClause(whereClause);
+    }
+
     return item;
+}
+
+ConstantItem
+AstBuilder::buildConstant(Parser::ConstantItemContext *context) const {
+    ConstantItem item;
+    item.name = context->identifier()->getText();
+    item.type = context->typeRef()->getText();
+    item.value = buildConstValue(context->constValue());
+    return item;
+}
+
+ConstValue
+AstBuilder::buildConstValue(Parser::ConstValueContext *context) const {
+    if (context->LPAREN() != nullptr) {
+        return buildConstValue(context->constValue());
+    }
+
+    ConstValue value;
+    if (context->INTEGER_LITERAL() != nullptr) {
+        value.kind = ConstValue::Kind::Integer;
+        value.value = context->INTEGER_LITERAL()->getText();
+    } else if (context->TRUE() != nullptr) {
+        value.kind = ConstValue::Kind::Boolean;
+        value.value = "true";
+    } else if (context->FALSE() != nullptr) {
+        value.kind = ConstValue::Kind::Boolean;
+        value.value = "false";
+    } else if (context->pathInExpression() != nullptr) {
+        value.kind = ConstValue::Kind::Path;
+        value.value = context->pathInExpression()->getText();
+    } else if (context->MINUS() != nullptr) {
+        value.kind = ConstValue::Kind::Negate;
+        value.operand = std::make_unique<ConstValue>();
+        *value.operand = buildMagnitude(context->magnitude());
+    } else {
+        unsupported(context);
+    }
+    return value;
+}
+
+ConstValue
+AstBuilder::buildMagnitude(Parser::MagnitudeContext *context) const {
+    if (context->LPAREN() != nullptr) {
+        return buildMagnitude(context->magnitude());
+    }
+
+    ConstValue value;
+    if (context->INTEGER_LITERAL() != nullptr) {
+        value.kind = ConstValue::Kind::Integer;
+        value.value = context->INTEGER_LITERAL()->getText();
+    } else if (context->pathInExpression() != nullptr) {
+        value.kind = ConstValue::Kind::Path;
+        value.value = context->pathInExpression()->getText();
+    } else {
+        unsupported(context);
+    }
+    return value;
 }
 
 BlockExpr

@@ -495,6 +495,49 @@ void StructField::print(std::ostream &out, std::size_t indent) const {
     out << name << ": " << type << '\n';
 }
 
+void SelfParam::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "SelfParam ";
+    if (isBorrowed) {
+        out << '&';
+    }
+    if (lifetime) {
+        out << *lifetime << ' ';
+    }
+    if (isMutable) {
+        out << "mut ";
+    }
+    out << "self\n";
+}
+
+void WhereClauseItem::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "WhereClauseItem\n";
+    if (lifetime) {
+        detail::printIndent(out, indent + 1);
+        out << "Lifetime " << *lifetime << '\n';
+    } else if (type) {
+        detail::printIndent(out, indent + 1);
+        out << "Type " << *type << '\n';
+    }
+    if (!bounds.empty()) {
+        detail::printIndent(out, indent + 1);
+        out << "Bounds";
+        for (const auto &bound : bounds) {
+            out << ' ' << bound;
+        }
+        out << '\n';
+    }
+}
+
+void WhereClause::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "WhereClause\n";
+    for (const auto &item : items) {
+        item.print(out, indent + 1);
+    }
+}
+
 void LifetimeParam::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "LifetimeParam " << lifetime << '\n';
@@ -520,11 +563,14 @@ void StructItem::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Struct " << name;
     out << '\n';
+    for (const auto &attribute : attributes) {
+        attribute.print(out, indent + 1);
+    }
     if (genericParams) {
         genericParams->print(out, indent + 1);
     }
-    for (const auto &attribute : attributes) {
-        attribute.print(out, indent + 1);
+    if (whereClause) {
+        whereClause->print(out, indent + 1);
     }
     for (const auto &field : fields) {
         field.print(out, indent + 1);
@@ -550,9 +596,15 @@ void Function::print(std::ostream &out, std::size_t indent) const {
     if (genericParams) {
         genericParams->print(out, indent + 1);
     }
+    if (selfParam) {
+        selfParam->print(out, indent + 1);
+    }
     for (const auto &parameter : parameters) {
         detail::printIndent(out, indent + 1);
         out << "Parameter " << parameter.name << ": " << parameter.type << '\n';
+    }
+    if (whereClause) {
+        whereClause->print(out, indent + 1);
     }
 
     body.print(out, indent + 1);
@@ -568,6 +620,31 @@ void DeriveAttribute::print(std::ostream &out, std::size_t indent) const {
         detail::printIndent(out, indent + 1);
         out << "Trait " << deriveTraitText(trait) << '\n';
     }
+}
+
+void ConstValue::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    switch (kind) {
+    case Kind::Integer:
+        out << "Integer " << value << '\n';
+        break;
+    case Kind::Boolean:
+        out << "Boolean " << value << '\n';
+        break;
+    case Kind::Path:
+        out << "Path " << value << '\n';
+        break;
+    case Kind::Negate:
+        out << "Negate\n";
+        operand->print(out, indent + 1);
+        break;
+    }
+}
+
+void ConstantItem::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Constant " << name << ": " << type << '\n';
+    value.print(out, indent + 1);
 }
 
 void Program::print(std::ostream &out) const {

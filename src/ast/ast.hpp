@@ -226,6 +226,29 @@ struct Parameter {
     std::string type;
 };
 
+struct SelfParam {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    bool isBorrowed = false;
+    bool isMutable = false;
+    std::optional<std::string> lifetime;
+};
+
+struct WhereClauseItem {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    // Exactly one of the two left-hand sides is populated.
+    std::optional<std::string> lifetime; // lifetime COLON lifetimeBounds
+    std::optional<std::string> type;     // typeRef COLON typeParamBounds?
+    std::vector<std::string> bounds;
+};
+
+struct WhereClause {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::vector<WhereClauseItem> items;
+};
+
 struct LifetimeParam {
     void print(std::ostream &out, std::size_t indent) const;
 
@@ -320,8 +343,10 @@ struct Function final : Item {
 
     std::string name;
     std::optional<GenericParam> genericParams;
+    std::optional<SelfParam> selfParam;
     std::vector<Parameter> parameters;
     std::optional<std::string> returnType;
+    std::optional<WhereClause> whereClause;
     BlockExpr body;
 };
 
@@ -339,6 +364,30 @@ struct StructItem final : Item {
     std::optional<GenericParam> genericParams;
     std::vector<DeriveAttribute> attributes;
     std::vector<StructField> fields;
+    std::optional<WhereClause> whereClause;
+};
+
+struct ConstValue {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    enum class Kind {
+        Integer,
+        Boolean,
+        Path,
+        Negate,
+    };
+
+    Kind kind;
+    std::string value;
+    std::unique_ptr<ConstValue> operand; // 仅 Negate 使用
+};
+
+struct ConstantItem final : Item {
+    void print(std::ostream &out, std::size_t indent = 0) const override;
+
+    std::string name;
+    std::string type;
+    ConstValue value;
 };
 
 struct Program {
