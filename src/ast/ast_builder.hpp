@@ -18,6 +18,8 @@ class AstBuilder {
     buildWhereClause(Parser::WhereClauseContext *context) const;
     ConstantItem
     buildConstant(Parser::ConstantItemContext *context) const;
+    ImplItem
+    buildImpl(Parser::InherentImplContext *context) const;
     ConstValue
     buildConstValue(Parser::ConstValueContext *context) const;
     ConstValue

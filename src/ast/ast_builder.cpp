@@ -36,6 +36,8 @@ Program AstBuilder::build(Parser::CrateContext *crate) const {
             program.items.push_back(std::make_unique<StructItem>(buildStruct(item->structDefinition())));
         } else if (item->constantItem() != nullptr) {
             program.items.push_back(std::make_unique<ConstantItem>(buildConstant(item->constantItem())));
+        } else if (item->inherentImpl() != nullptr) {
+            program.items.push_back(std::make_unique<ImplItem>(buildImpl(item->inherentImpl())));
         }
     }
     return program;
@@ -168,6 +170,32 @@ AstBuilder::buildConstant(Parser::ConstantItemContext *context) const {
     item.name = context->identifier()->getText();
     item.type = context->typeRef()->getText();
     item.value = buildConstValue(context->constValue());
+    return item;
+}
+
+ImplItem
+AstBuilder::buildImpl(Parser::InherentImplContext *context) const {
+    ImplItem item;
+    item.typeName = context->typeRef()->getText();
+    if (auto *genericParams = context->genericParams()) {
+        item.genericParams = buildGenericParams(genericParams);
+    }
+    if (auto *whereClause = context->whereClause()) {
+        item.whereClause = buildWhereClause(whereClause);
+    }
+    for (auto *associated : context->associatedItem()) {
+        if (associated->constantItem() != nullptr) {
+            item.associatedItems.push_back(
+                std::make_unique<ConstantItem>(
+                    buildConstant(associated->constantItem())));
+        } else if (associated->functionDefinition() != nullptr) {
+            item.associatedItems.push_back(
+                std::make_unique<Function>(
+                    buildFunction(associated->functionDefinition())));
+        } else {
+            unsupported(associated);
+        }
+    }
     return item;
 }
 

@@ -79,7 +79,7 @@ std::string_view binaryOpText(BinaryOp op) {
     case BinaryOp::BitwiseOr:
         return "|";
     case BinaryOp::Less:
-        return "<";
+        return "<";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
     case BinaryOp::LessEqual:
         return "<=";
     case BinaryOp::Greater:
@@ -645,6 +645,20 @@ void ConstantItem::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Constant " << name << ": " << type << '\n';
     value.print(out, indent + 1);
+}
+
+void ImplItem::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Impl " << typeName << '\n';
+    if (genericParams) {
+        genericParams->print(out, indent + 1);
+    }
+    if (whereClause) {
+        whereClause->print(out, indent + 1);
+    }
+    for (const auto &item : associatedItems) {
+        item->print(out, indent + 1);
+    }
 }
 
 void Program::print(std::ostream &out) const {

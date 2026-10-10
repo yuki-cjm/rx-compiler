@@ -390,6 +390,15 @@ struct ConstantItem final : Item {
     ConstValue value;
 };
 
+struct ImplItem final : Item {
+    void print(std::ostream &out, std::size_t indent = 0) const override;
+
+    std::string typeName;
+    std::optional<GenericParam> genericParams;
+    std::optional<WhereClause> whereClause;
+    std::vector<ItemPtr> associatedItems;
+};
+
 struct Program {
     std::vector<ItemPtr> items;
 
