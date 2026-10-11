@@ -27,8 +27,8 @@ ruleChildren(antlr4::ParserRuleContext *context) {
 
 TypePtr buildType(Parser::TypeRefContext *context);
 
-GenericParam buildGenericParams(Parser::GenericParamsContext *context) {
-    GenericParam genericParams;
+GenericParams buildGenericParams(Parser::GenericParamsContext *context) {
+    GenericParams genericParams;
     genericParams.params.reserve(context->lifetimeParam().size());
 
     for (auto *lifetimeParam : context->lifetimeParam()) {

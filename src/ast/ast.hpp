@@ -318,7 +318,7 @@ struct LifetimeParam {
     std::optional<std::vector<std::string>> lifetimeBounds;
 };
 
-struct GenericParam {
+struct GenericParams {
     void print(std::ostream &out, std::size_t indent) const;
 
     std::vector<LifetimeParam> params;
@@ -403,7 +403,7 @@ struct FunctionItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
     std::string name;
-    std::optional<GenericParam> genericParams;
+    std::optional<GenericParams> genericParams;
     std::optional<SelfParam> selfParam;
     std::vector<Parameter> parameters;
     TypePtr returnType;
@@ -422,7 +422,7 @@ struct StructItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
     std::string name;
-    std::optional<GenericParam> genericParams;
+    std::optional<GenericParams> genericParams;
     std::vector<DeriveAttribute> attributes;
     std::vector<StructField> fields;
     std::optional<WhereClause> whereClause;
@@ -440,7 +440,7 @@ struct ImplItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
     TypePtr typeName;
-    std::optional<GenericParam> genericParams;
+    std::optional<GenericParams> genericParams;
     std::optional<WhereClause> whereClause;
     std::vector<ItemPtr> associatedItems;
 };

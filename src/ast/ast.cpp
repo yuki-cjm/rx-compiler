@@ -630,7 +630,7 @@ void LifetimeParam::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
-void GenericParam::print(std::ostream &out, std::size_t indent) const {
+void GenericParams::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "GenericParams\n";
     for (const auto &parameter : params) {
