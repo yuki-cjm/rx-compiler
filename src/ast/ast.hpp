@@ -72,7 +72,6 @@ UnaryOp unaryOpFromText(const std::string &text);
 std::string binaryOpText(BinaryOp op);
 BinaryOp binaryOpFromText(const std::string &text);
 std::string deriveTraitText(DeriveTrait trait);
-DeriveTrait deriveTraitFromText(const std::string &text);
 
 class ASTNode {
   public:
@@ -90,6 +89,18 @@ using StmtPtr = std::unique_ptr<Stmt>;
 using ExprPtr = std::unique_ptr<Expr>;
 using TypePtr = std::unique_ptr<Type>;
 
+struct Magnitude {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    enum class Kind {
+        Integer,
+        Path,
+    };
+
+    Kind kind;
+    std::string value;
+};
+
 struct ConstValue {
     void print(std::ostream &out, std::size_t indent) const;
 
@@ -103,7 +114,7 @@ struct ConstValue {
     Kind kind;
     std::string value;
     bool boolValue = false;
-    std::unique_ptr<ConstValue> operand;
+    Magnitude operand;
 };
 
 struct PathSegment {
@@ -184,11 +195,17 @@ class EmptyStmt final : public Stmt {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 };
 
-struct LetStmt : public Stmt {
-    void print(std::ostream &out, std::size_t indent) const override;
+struct IdentifierBinding {
+    void print(std::ostream &out, std::size_t indent) const;
 
     std::string name;
     bool isMutable = false;
+};
+
+struct LetStmt : public Stmt {
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    IdentifierBinding binding;
     TypePtr type;
     ExprPtr initializer;
 };
@@ -242,11 +259,11 @@ struct IndexExpr final : Expr {
 };
 
 struct FieldAccessExpr final : Expr {
-    FieldAccessExpr(ExprPtr operand, std::string field);
+    FieldAccessExpr(ExprPtr operand, PathExprSegment field);
     void print(std::ostream &out, std::size_t indent) const override;
 
     ExprPtr operand;
-    std::string field;
+    PathExprSegment field;
 };
 
 struct UnaryExpr final : Expr {
@@ -283,9 +300,10 @@ struct ArrayExpr final : Expr {
     std::optional<ConstValue> repeatCount;
 };
 
-struct Parameter {
-    std::string name;
-    bool isMutable = false;
+struct FunctionParam {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    IdentifierBinding binding;
     TypePtr type;
 };
 
@@ -405,7 +423,7 @@ struct FunctionItem final : Item {
     std::string name;
     std::optional<GenericParams> genericParams;
     std::optional<SelfParam> selfParam;
-    std::vector<Parameter> parameters;
+    std::vector<FunctionParam> parameters;
     TypePtr returnType;
     std::optional<WhereClause> whereClause;
     BlockExpr body;

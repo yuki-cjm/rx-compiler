@@ -79,17 +79,17 @@ WhereClause buildWhereClause(Parser::WhereClauseContext *context) {
     return clause;
 }
 
-ConstValue buildMagnitude(Parser::MagnitudeContext *context) {
+Magnitude buildMagnitude(Parser::MagnitudeContext *context) {
     if (context->LPAREN() != nullptr) {
         return buildMagnitude(context->magnitude());
     }
 
-    ConstValue value;
+    Magnitude value;
     if (context->INTEGER_LITERAL() != nullptr) {
-        value.kind = ConstValue::Kind::Integer;
+        value.kind = Magnitude::Kind::Integer;
         value.value = context->INTEGER_LITERAL()->getText();
     } else if (context->pathInExpression() != nullptr) {
-        value.kind = ConstValue::Kind::Path;
+        value.kind = Magnitude::Kind::Path;
         value.value = context->pathInExpression()->getText();
     } else {
         unsupported(context);
@@ -117,8 +117,7 @@ ConstValue buildConstValue(Parser::ConstValueContext *context) {
         value.value = context->pathInExpression()->getText();
     } else if (context->MINUS() != nullptr) {
         value.kind = ConstValue::Kind::Negate;
-        value.operand = std::make_unique<ConstValue>();
-        *value.operand = buildMagnitude(context->magnitude());
+        value.operand = buildMagnitude(context->magnitude());
     } else {
         unsupported(context);
     }
@@ -216,6 +215,41 @@ buildGenericArgs(Parser::GenericArgsContext *genericArgs) {
         args.push_back(std::move(arg));
     }
     return args;
+}
+
+DeriveTrait buildDeriveTrait(Parser::DeriveNameContext *context) {
+    if (context->COPY() != nullptr) {
+        return DeriveTrait::Copy;
+    }
+    if (context->CLONE() != nullptr) {
+        return DeriveTrait::Clone;
+    }
+    if (context->PARTIAL_EQ() != nullptr) {
+        return DeriveTrait::PartialEq;
+    }
+    if (context->EQ() != nullptr) {
+        return DeriveTrait::Eq;
+    }
+    unsupported(context);
+    return DeriveTrait::Eq;
+}
+
+IdentifierBinding
+buildIdentifierBinding(Parser::IdentifierBindingContext *context) {
+    IdentifierBinding binding;
+    binding.name = context->identifier()->getText();
+    binding.isMutable = context->MUT() != nullptr;
+    return binding;
+}
+
+PathExprSegment
+buildPathExprSegment(Parser::PathExprSegmentContext *context) {
+    PathExprSegment segment;
+    segment.ident = buildPathIdentSegment(context->pathIdentSegment());
+    if (auto *genericArgs = context->genericArgs()) {
+        segment.genericArgs = buildGenericArgs(genericArgs);
+    }
+    return segment;
 }
 
 TypePtr buildReferenceType(bool isDouble,
@@ -355,10 +389,9 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
                     item.selfParam = std::move(self);
                 }
                 for (auto *parameter : parameters->functionParam()) {
-                    auto *binding = parameter->identifierBinding();
-                    Parameter built;
-                    built.name = binding->identifier()->getText();
-                    built.isMutable = binding->MUT() != nullptr;
+                    FunctionParam built;
+                    built.binding =
+                        buildIdentifierBinding(parameter->identifierBinding());
                     built.type = buildType(parameter->typeRef());
                     item.parameters.push_back(std::move(built));
                 }
@@ -393,7 +426,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
             std::vector<DeriveTrait> traits;
             traits.reserve(attribute->deriveName().size());
             for (auto *deriveName : attribute->deriveName()) {
-                traits.push_back(deriveTraitFromText(deriveName->getText()));
+                traits.push_back(buildDeriveTrait(deriveName));
             }
             item.attributes.emplace_back(std::move(traits));
         }
@@ -447,8 +480,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
 StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     if (auto *let = context->letStatement()) {
         auto statement = std::make_unique<LetStmt>();
-        statement->name = let->identifierBinding()->identifier()->getText();
-        statement->isMutable = let->identifierBinding()->MUT() != nullptr;
+        statement->binding = buildIdentifierBinding(let->identifierBinding());
         if (auto *type = let->typeRef()) {
             statement->type = buildType(type);
         }
@@ -488,12 +520,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
     const auto buildPath = [](Parser::PathInExpressionContext *path) {
         std::vector<PathExprSegment> segments;
         for (auto *segment : path->pathExprSegment()) {
-            PathExprSegment result;
-            result.ident = buildPathIdentSegment(segment->pathIdentSegment());
-            if (auto *genericArgs = segment->genericArgs()) {
-                result.genericArgs = buildGenericArgs(genericArgs);
-            }
-            segments.push_back(std::move(result));
+            segments.push_back(buildPathExprSegment(segment));
         }
         return PathInExpr(std::move(segments));
     };
@@ -539,11 +566,12 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
 
     const auto applyDotSuffix = [this](ExprPtr result,
                                        Parser::DotSuffixContext *dotSuffix) {
-        std::string field;
+        PathExprSegment field;
         if (dotSuffix->pathExprSegment() != nullptr) {
-            field = dotSuffix->pathExprSegment()->getText();
+            field = buildPathExprSegment(dotSuffix->pathExprSegment());
         } else if (dotSuffix->identifier() != nullptr) {
-            field = dotSuffix->identifier()->getText();
+            field.ident.kind = PathSegmentKind::Ident;
+            field.ident.name = dotSuffix->identifier()->getText();
         } else {
             unsupported(dotSuffix);
         }

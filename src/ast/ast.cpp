@@ -225,19 +225,6 @@ std::string deriveTraitText(DeriveTrait trait) {
     invalidOperator();
 }
 
-DeriveTrait deriveTraitFromText(const std::string &text) {
-    if (text == "Copy") {
-        return rx::ast::DeriveTrait::Copy;
-    } else if (text == "Clone") {
-        return rx::ast::DeriveTrait::Clone;
-    } else if (text == "PartialEq") {
-        return rx::ast::DeriveTrait::PartialEq;
-    } else if (text == "Eq") {
-        return rx::ast::DeriveTrait::Eq;
-    }
-    throw std::invalid_argument("unknown derive trait: " + text);
-}
-
 IntegerLiteralExpr::IntegerLiteralExpr(std::string value)
     : value(std::move(value)) {}
 
@@ -316,12 +303,13 @@ void IndexExpr::print(std::ostream &out, std::size_t indent) const {
     index->print(out, indent + 1);
 }
 
-FieldAccessExpr::FieldAccessExpr(ExprPtr operand, std::string field)
+FieldAccessExpr::FieldAccessExpr(ExprPtr operand, PathExprSegment field)
     : operand(std::move(operand)), field(std::move(field)) {}
 
 void FieldAccessExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "FieldAccess " << field << '\n';
+    out << "FieldAccess\n";
+    field.print(out, indent + 1);
     operand->print(out, indent + 1);
 }
 
@@ -443,9 +431,18 @@ void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
 BlockExpr::BlockExpr(std::vector<StmtPtr> statements, ExprPtr tail)
     : statements(std::move(statements)), tail(std::move(tail)) {}
 
+void IdentifierBinding::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    if (isMutable) {
+        out << "mut ";
+    }
+    out << name << '\n';
+}
+
 void LetStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Let " << (isMutable ? "mut " : "") << name << '\n';
+    out << "Let\n";
+    binding.print(out, indent + 1);
     if (type) {
         detail::printIndent(out, indent + 1);
         out << "Type\n";
@@ -573,6 +570,13 @@ void StructField::print(std::ostream &out, std::size_t indent) const {
     type->print(out, indent + 1);
 }
 
+void FunctionParam::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "FunctionParameter\n";
+    binding.print(out, indent + 1);
+    type->print(out, indent + 1);
+}
+
 void SelfParam::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "SelfParam ";
@@ -680,10 +684,7 @@ void FunctionItem::print(std::ostream &out, std::size_t indent) const {
         selfParam->print(out, indent + 1);
     }
     for (const auto &parameter : parameters) {
-        detail::printIndent(out, indent + 1);
-        out << "Parameter " << (parameter.isMutable ? "mut " : "")
-            << parameter.name << '\n';
-        parameter.type->print(out, indent + 2);
+        parameter.print(out, indent + 1);
     }
     if (whereClause) {
         whereClause->print(out, indent + 1);
@@ -704,6 +705,18 @@ void DeriveAttribute::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+void Magnitude::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    switch (kind) {
+    case Kind::Integer:
+        out << "Integer " << value << '\n';
+        break;
+    case Kind::Path:
+        out << "Path " << value << '\n';
+        break;
+    }
+}
+
 void ConstValue::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     switch (kind) {
@@ -718,7 +731,7 @@ void ConstValue::print(std::ostream &out, std::size_t indent) const {
         break;
     case Kind::Negate:
         out << "Negate\n";
-        operand->print(out, indent + 1);
+        operand.print(out, indent + 1);
         break;
     }
 }
