@@ -2,6 +2,7 @@
 #include "Parser.h"
 #include "antlr4-runtime.h"
 #include "ast/ast_builder.hpp"
+#include "ast/ast_printer.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -80,8 +81,9 @@ int main(int argc, char **argv) {
     }
 
     try {
-        const rx::ast::Program program = rx::ast::AstBuilder().build(tree);
-        program.print(std::cout);
+        rx::ast::Program program = rx::ast::AstBuilder().build(tree);
+        rx::ast::ASTPrinter printer(std::cout);
+        printer.printProgram(program);
     } catch (const std::runtime_error &error) {
         std::cerr << "AST lowering error: " << error.what() << '\n';
         return 1;

@@ -1,14 +1,16 @@
 #pragma once
 
+#include <any>
 #include <cstddef>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace rx::ast {
+
+class ASTVisitor;
 
 enum class UnaryOp {
     Negate,
@@ -76,7 +78,7 @@ std::string deriveTraitText(DeriveTrait trait);
 class ASTNode {
   public:
     virtual ~ASTNode() = default;
-    virtual void print(std::ostream &out, std::size_t indent = 0) const = 0;
+    virtual std::any accept(ASTVisitor &visitor) = 0;
 };
 
 class Item : public ASTNode {};
@@ -90,8 +92,6 @@ using ExprPtr = std::unique_ptr<Expr>;
 using TypePtr = std::unique_ptr<Type>;
 
 struct Magnitude {
-    void print(std::ostream &out, std::size_t indent) const;
-
     enum class Kind {
         Integer,
         Path,
@@ -102,8 +102,6 @@ struct Magnitude {
 };
 
 struct ConstValue {
-    void print(std::ostream &out, std::size_t indent) const;
-
     enum class Kind {
         Integer,
         Boolean,
@@ -118,45 +116,37 @@ struct ConstValue {
 };
 
 struct PathSegment {
-    void print(std::ostream &out, std::size_t indent) const;
-
     PathSegmentKind kind = PathSegmentKind::Ident;
     std::string name;
 };
 
 struct GenericArg {
-    void print(std::ostream &out, std::size_t indent) const;
-
     std::optional<std::string> lifetime;
     TypePtr type;
 };
 
 struct TypePathSegment {
-    void print(std::ostream &out, std::size_t indent) const;
-
     PathSegment ident;
     std::optional<std::vector<GenericArg>> genericArgs;
 };
 
 struct PathExprSegment {
-    void print(std::ostream &out, std::size_t indent) const;
-
     PathSegment ident;
     std::optional<std::vector<GenericArg>> genericArgs;
 };
 
 struct UnitType final : Type {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 };
 
 struct PathType final : Type {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::vector<TypePathSegment> segments;
 };
 
 struct ReferenceType final : Type {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::optional<std::string> lifetime;
     bool isMutable = false;
@@ -164,27 +154,20 @@ struct ReferenceType final : Type {
 };
 
 struct ArrayType final : Type {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     TypePtr element;
     ConstValue length;
 };
 
-namespace detail {
-
-inline void printIndent(std::ostream &out, std::size_t indent) {
-    for (std::size_t i = 0; i < indent; ++i) {
-        out << "  ";
-    }
-}
-
-} // namespace detail
-
 class Crate final : public ASTNode {
   public:
     void addItem(ItemPtr item) { items_.push_back(std::move(item)); }
 
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
+
+    std::vector<ItemPtr> &items() { return items_; }
+    const std::vector<ItemPtr> &items() const { return items_; }
 
   private:
     std::vector<ItemPtr> items_;
@@ -192,18 +175,16 @@ class Crate final : public ASTNode {
 
 class EmptyStmt final : public Stmt {
   public:
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
 };
 
 struct IdentifierBinding {
-    void print(std::ostream &out, std::size_t indent) const;
-
     std::string name;
     bool isMutable = false;
 };
 
 struct LetStmt : public Stmt {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     IdentifierBinding binding;
     TypePtr type;
@@ -212,39 +193,39 @@ struct LetStmt : public Stmt {
 
 struct ExprStmt : public Stmt {
     ExprStmt(ExprPtr expression);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr expression;
 };
 
 struct IntegerLiteralExpr final : Expr {
     explicit IntegerLiteralExpr(std::string value);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::string value;
 };
 
 struct BooleanLiteralExpr final : Expr {
     explicit BooleanLiteralExpr(bool value);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     bool value;
 };
 
 struct UnitExpr final : Expr {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 };
 
 struct PathInExpr final : Expr {
     explicit PathInExpr(std::vector<PathExprSegment> segments);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::vector<PathExprSegment> segments;
 };
 
 struct CallExpr final : Expr {
     CallExpr(ExprPtr callee, std::vector<ExprPtr> arguments);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr callee;
     std::vector<ExprPtr> arguments;
@@ -252,7 +233,7 @@ struct CallExpr final : Expr {
 
 struct IndexExpr final : Expr {
     IndexExpr(ExprPtr operand, ExprPtr index);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr operand;
     ExprPtr index;
@@ -260,7 +241,7 @@ struct IndexExpr final : Expr {
 
 struct FieldAccessExpr final : Expr {
     FieldAccessExpr(ExprPtr operand, PathExprSegment field);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr operand;
     PathExprSegment field;
@@ -268,7 +249,7 @@ struct FieldAccessExpr final : Expr {
 
 struct UnaryExpr final : Expr {
     UnaryExpr(UnaryOp op, ExprPtr operand);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     UnaryOp op;
     ExprPtr operand;
@@ -276,7 +257,7 @@ struct UnaryExpr final : Expr {
 
 struct CastExpr final : Expr {
     CastExpr(ExprPtr operand, TypePtr targetType);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr operand;
     TypePtr targetType;
@@ -284,7 +265,7 @@ struct CastExpr final : Expr {
 
 struct BinaryExpr final : Expr {
     BinaryExpr(BinaryOp op, ExprPtr left, ExprPtr right);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     BinaryOp op;
     ExprPtr left;
@@ -294,57 +275,45 @@ struct BinaryExpr final : Expr {
 struct ArrayExpr final : Expr {
     ArrayExpr(std::vector<ExprPtr> elements,
               std::optional<ConstValue> repeatCount = std::nullopt);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::vector<ExprPtr> elements;
     std::optional<ConstValue> repeatCount;
 };
 
 struct FunctionParam {
-    void print(std::ostream &out, std::size_t indent) const;
-
     IdentifierBinding binding;
     TypePtr type;
 };
 
 struct SelfParam {
-    void print(std::ostream &out, std::size_t indent) const;
-
     bool isBorrowed = false;
     bool isMutable = false;
     std::optional<std::string> lifetime;
 };
 
 struct WhereClauseItem {
-    void print(std::ostream &out, std::size_t indent) const;
-
     std::optional<std::string> lifetime;
     TypePtr type;
     std::vector<std::string> bounds;
 };
 
 struct WhereClause {
-    void print(std::ostream &out, std::size_t indent) const;
-
     std::vector<WhereClauseItem> items;
 };
 
 struct LifetimeParam {
-    void print(std::ostream &out, std::size_t indent) const;
-
     std::string lifetime;
     std::optional<std::vector<std::string>> lifetimeBounds;
 };
 
 struct GenericParams {
-    void print(std::ostream &out, std::size_t indent) const;
-
     std::vector<LifetimeParam> params;
 };
 
 struct BlockExpr final : Expr {
     explicit BlockExpr(std::vector<StmtPtr> statements = {}, ExprPtr tail = {});
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::vector<StmtPtr> statements;
     ExprPtr tail;
@@ -352,7 +321,7 @@ struct BlockExpr final : Expr {
 
 struct IfExpr final : Expr {
     IfExpr(ExprPtr condition, BlockExpr thenBranch, ExprPtr elseBranch);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr condition;
     BlockExpr thenBranch;
@@ -361,14 +330,14 @@ struct IfExpr final : Expr {
 
 struct LoopExpr final : Expr {
     LoopExpr(BlockExpr body);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     BlockExpr body;
 };
 
 struct WhileExpr final : Expr {
     WhileExpr(ExprPtr condition, BlockExpr body);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr condition;
     BlockExpr body;
@@ -376,25 +345,24 @@ struct WhileExpr final : Expr {
 
 struct BreakExpr final : Expr {
     BreakExpr(ExprPtr value);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr value;
 };
 
 struct ReturnExpr final : Expr {
     ReturnExpr(ExprPtr value);
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr value;
 };
 
 struct ContinueExpr final : Expr {
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 };
 
 struct StructExprField {
     StructExprField(std::string name, ExprPtr value);
-    void print(std::ostream &out, std::size_t indent) const;
 
     std::string name;
     ExprPtr value;
@@ -403,7 +371,7 @@ struct StructExprField {
 struct StructExpr final : Expr {
     StructExpr(PathInExpr path, std::vector<StructExprField> fields);
 
-    void print(std::ostream &out, std::size_t indent) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     PathInExpr path;
     std::vector<StructExprField> fields;
@@ -411,14 +379,13 @@ struct StructExpr final : Expr {
 
 struct StructField {
     StructField(std::string name, TypePtr type);
-    void print(std::ostream &out, std::size_t indent) const;
 
     std::string name;
     TypePtr type;
 };
 
 struct FunctionItem final : Item {
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::string name;
     std::optional<GenericParams> genericParams;
@@ -431,13 +398,12 @@ struct FunctionItem final : Item {
 
 struct DeriveAttribute {
     DeriveAttribute(std::vector<DeriveTrait> traits);
-    void print(std::ostream &out, std::size_t indent) const;
 
     std::vector<DeriveTrait> traits;
 };
 
 struct StructItem final : Item {
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::string name;
     std::optional<GenericParams> genericParams;
@@ -447,7 +413,7 @@ struct StructItem final : Item {
 };
 
 struct ConstantItem final : Item {
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     std::string name;
     TypePtr type;
@@ -455,7 +421,7 @@ struct ConstantItem final : Item {
 };
 
 struct ImplItem final : Item {
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     TypePtr typeName;
     std::optional<GenericParams> genericParams;
@@ -464,15 +430,11 @@ struct ImplItem final : Item {
 };
 
 struct UsePath {
-    void print(std::ostream &out, std::size_t indent) const;
-
     bool leadingPathSep = false;
     std::vector<PathSegment> segments;
 };
 
 struct UseTree {
-    void print(std::ostream &out, std::size_t indent) const;
-
     enum class Kind {
         Glob,
         List,
@@ -492,15 +454,13 @@ struct UseTree {
 };
 
 struct UseItem final : Item {
-    void print(std::ostream &out, std::size_t indent = 0) const override;
+    std::any accept(ASTVisitor &visitor) override;
 
     UseTree tree;
 };
 
 struct Program {
     std::vector<ItemPtr> items;
-
-    void print(std::ostream &out) const;
 };
 
 } // namespace rx::ast

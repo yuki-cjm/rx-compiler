@@ -14,6 +14,7 @@ add_executable(rx-parse
     src/main.cpp
     src/ast/ast.cpp
     src/ast/ast_builder.cpp
+    src/ast/ast_printer.cpp
     generated/Lexer.cpp
     generated/Parser.cpp
     generated/ParserBaseListener.cpp

@@ -1,5 +1,7 @@
 #include "ast.hpp"
 
+#include "ast_visitor.hpp"
+
 #include <stdexcept>
 #include <utility>
 
@@ -225,604 +227,190 @@ std::string deriveTraitText(DeriveTrait trait) {
     invalidOperator();
 }
 
+std::any Crate::accept(ASTVisitor &visitor) { return visitor.visitCrate(this); }
+
+std::any EmptyStmt::accept(ASTVisitor &visitor) {
+    return visitor.visitEmptyStmt(this);
+}
+
+std::any LetStmt::accept(ASTVisitor &visitor) {
+    return visitor.visitLetStmt(this);
+}
+
+ExprStmt::ExprStmt(ExprPtr expression) : expression(std::move(expression)) {}
+
+std::any ExprStmt::accept(ASTVisitor &visitor) {
+    return visitor.visitExprStmt(this);
+}
+
 IntegerLiteralExpr::IntegerLiteralExpr(std::string value)
     : value(std::move(value)) {}
 
-void IntegerLiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "IntegerLiteral " << value << '\n';
+std::any IntegerLiteralExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitIntegerLiteralExpr(this);
 }
 
 BooleanLiteralExpr::BooleanLiteralExpr(bool value) : value(value) {}
 
-void BooleanLiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "BooleanLiteral " << (value ? "true" : "false") << '\n';
+std::any BooleanLiteralExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitBooleanLiteralExpr(this);
 }
 
-void UnitExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Unit\n";
+std::any UnitExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitUnitExpr(this);
 }
 
 PathInExpr::PathInExpr(std::vector<PathExprSegment> segments)
     : segments(std::move(segments)) {}
 
-void PathSegment::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    switch (kind) {
-    case PathSegmentKind::Ident:
-        out << "Ident " << name << '\n';
-        break;
-    case PathSegmentKind::SelfValue:
-        out << "SelfValue\n";
-        break;
-    case PathSegmentKind::SelfType:
-        out << "SelfType\n";
-        break;
-    case PathSegmentKind::Super:
-        out << "Super\n";
-        break;
-    case PathSegmentKind::Crate:
-        out << "Crate\n";
-        break;
-    }
-}
-
-void PathInExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Path\n";
-    for (const auto &segment : segments) {
-        segment.print(out, indent + 1);
-    }
+std::any PathInExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitPathInExpr(this);
 }
 
 CallExpr::CallExpr(ExprPtr callee, std::vector<ExprPtr> arguments)
     : callee(std::move(callee)), arguments(std::move(arguments)) {}
 
-void CallExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Call\n";
-    detail::printIndent(out, indent + 1);
-    out << "Callee\n";
-    callee->print(out, indent + 2);
-    detail::printIndent(out, indent + 1);
-    out << "Arguments\n";
-    for (const auto &argument : arguments) {
-        argument->print(out, indent + 2);
-    }
+std::any CallExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitCallExpr(this);
 }
 
 IndexExpr::IndexExpr(ExprPtr operand, ExprPtr index)
     : operand(std::move(operand)), index(std::move(index)) {}
 
-void IndexExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Index\n";
-    operand->print(out, indent + 1);
-    index->print(out, indent + 1);
+std::any IndexExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitIndexExpr(this);
 }
 
 FieldAccessExpr::FieldAccessExpr(ExprPtr operand, PathExprSegment field)
     : operand(std::move(operand)), field(std::move(field)) {}
 
-void FieldAccessExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "FieldAccess\n";
-    field.print(out, indent + 1);
-    operand->print(out, indent + 1);
+std::any FieldAccessExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitFieldAccessExpr(this);
 }
 
 UnaryExpr::UnaryExpr(UnaryOp op, ExprPtr operand)
     : op(op), operand(std::move(operand)) {}
 
-void UnaryExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Unary " << unaryOpText(op) << '\n';
-    operand->print(out, indent + 1);
-}
-
-void GenericArg::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    if (lifetime) {
-        out << "Lifetime " << *lifetime << '\n';
-    } else {
-        out << "Type\n";
-        type->print(out, indent + 1);
-    }
-}
-
-void TypePathSegment::print(std::ostream &out, std::size_t indent) const {
-    ident.print(out, indent);
-    if (genericArgs) {
-        detail::printIndent(out, indent + 1);
-        out << "GenericArgs\n";
-        for (const auto &arg : *genericArgs) {
-            arg.print(out, indent + 2);
-        }
-    }
-}
-
-void PathExprSegment::print(std::ostream &out, std::size_t indent) const {
-    ident.print(out, indent);
-    if (genericArgs) {
-        detail::printIndent(out, indent + 1);
-        out << "GenericArgs\n";
-        for (const auto &arg : *genericArgs) {
-            arg.print(out, indent + 2);
-        }
-    }
-}
-
-void UnitType::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "UnitType\n";
-}
-
-void PathType::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "PathType\n";
-    for (const auto &segment : segments) {
-        segment.print(out, indent + 1);
-    }
-}
-
-void ReferenceType::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "ReferenceType &";
-    if (lifetime) {
-        out << ' ' << *lifetime;
-    }
-    if (isMutable) {
-        out << " mut";
-    }
-    out << '\n';
-    inner->print(out, indent + 1);
-}
-
-void ArrayType::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "ArrayType\n";
-    element->print(out, indent + 1);
-    detail::printIndent(out, indent + 1);
-    out << "Length\n";
-    length.print(out, indent + 2);
+std::any UnaryExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitUnaryExpr(this);
 }
 
 CastExpr::CastExpr(ExprPtr operand, TypePtr targetType)
     : operand(std::move(operand)), targetType(std::move(targetType)) {}
 
-void CastExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Cast\n";
-    operand->print(out, indent + 1);
-    detail::printIndent(out, indent + 1);
-    out << "Type\n";
-    targetType->print(out, indent + 2);
+std::any CastExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitCastExpr(this);
 }
 
 BinaryExpr::BinaryExpr(BinaryOp op, ExprPtr left, ExprPtr right)
     : op(op), left(std::move(left)), right(std::move(right)) {}
 
-void BinaryExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Binary " << binaryOpText(op) << '\n';
-    left->print(out, indent + 1);
-    right->print(out, indent + 1);
+std::any BinaryExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitBinaryExpr(this);
 }
 
 ArrayExpr::ArrayExpr(std::vector<ExprPtr> elements,
                      std::optional<ConstValue> repeatCount)
     : elements(std::move(elements)), repeatCount(std::move(repeatCount)) {}
 
-void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << (repeatCount ? "ArrayRepeat\n" : "Array\n");
-    for (const auto &element : elements) {
-        element->print(out, indent + 1);
-    }
-    if (repeatCount) {
-        detail::printIndent(out, indent + 1);
-        out << "RepeatCount\n";
-        repeatCount->print(out, indent + 2);
-    }
+std::any ArrayExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitArrayExpr(this);
 }
 
 BlockExpr::BlockExpr(std::vector<StmtPtr> statements, ExprPtr tail)
     : statements(std::move(statements)), tail(std::move(tail)) {}
 
-void IdentifierBinding::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    if (isMutable) {
-        out << "mut ";
-    }
-    out << name << '\n';
-}
-
-void LetStmt::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Let\n";
-    binding.print(out, indent + 1);
-    if (type) {
-        detail::printIndent(out, indent + 1);
-        out << "Type\n";
-        type->print(out, indent + 2);
-    }
-    initializer->print(out, indent + 1);
-}
-
-void BlockExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Block\n";
-    for (const auto &statement : statements) {
-        statement->print(out, indent + 1);
-    }
-    if (tail) {
-        detail::printIndent(out, indent + 1);
-        out << "Tail\n";
-        tail->print(out, indent + 2);
-    }
+std::any BlockExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitBlockExpr(this);
 }
 
 IfExpr::IfExpr(ExprPtr condition, BlockExpr thenBranch, ExprPtr elseBranch)
     : condition(std::move(condition)), thenBranch(std::move(thenBranch)),
       elseBranch(std::move(elseBranch)) {}
 
-void IfExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "If\n";
-    condition->print(out, indent + 1);
-    thenBranch.print(out, indent + 2);
-    if (elseBranch) {
-        detail::printIndent(out, indent + 1);
-        out << "Else\n";
-        elseBranch->print(out, indent + 2);
-    }
+std::any IfExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitIfExpr(this);
 }
 
 LoopExpr::LoopExpr(BlockExpr body) : body(std::move(body)) {}
 
-void LoopExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Loop\n";
-    body.print(out, indent + 1);
+std::any LoopExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitLoopExpr(this);
 }
 
 WhileExpr::WhileExpr(ExprPtr condition, BlockExpr body)
     : condition(std::move(condition)), body(std::move(body)) {}
 
-void WhileExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "While\n";
-    condition->print(out, indent + 1);
-    body.print(out, indent + 1);
+std::any WhileExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitWhileExpr(this);
 }
 
 BreakExpr::BreakExpr(ExprPtr value) : value(std::move(value)) {}
 
-void BreakExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Break\n";
-    if (value) {
-        value->print(out, indent + 1);
-    }
+std::any BreakExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitBreakExpr(this);
 }
 
 ReturnExpr::ReturnExpr(ExprPtr value) : value(std::move(value)) {}
 
-void ReturnExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Return\n";
-    if (value) {
-        value->print(out, indent + 1);
-    }
+std::any ReturnExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitReturnExpr(this);
 }
 
-void ContinueExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Continue\n";
-}
-
-void EmptyStmt::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "EmptyStmt\n";
-}
-
-ExprStmt::ExprStmt(ExprPtr expression) : expression(std::move(expression)) {}
-
-void ExprStmt::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "ExprStmt\n";
-    expression->print(out, indent + 1);
+std::any ContinueExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitContinueExpr(this);
 }
 
 StructExprField::StructExprField(std::string name, ExprPtr value)
     : name(std::move(name)), value(std::move(value)) {}
 
-void StructExprField::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "StructExprField " << name << '\n';
-    value->print(out, indent + 1);
-}
-
 StructExpr::StructExpr(PathInExpr path, std::vector<StructExprField> fields)
     : path(std::move(path)), fields(std::move(fields)) {}
 
-void StructExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "StructExpr\n";
-    path.print(out, indent + 1);
-    detail::printIndent(out, indent + 1);
-    out << "Fields {\n";
-    for (const auto &field : fields) {
-        field.print(out, indent + 2);
-    }
-    detail::printIndent(out, indent + 1);
-    out << "}\n";
+std::any StructExpr::accept(ASTVisitor &visitor) {
+    return visitor.visitStructExpr(this);
 }
 
 StructField::StructField(std::string name, TypePtr type)
     : name(std::move(name)), type(std::move(type)) {}
 
-void StructField::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << name << '\n';
-    type->print(out, indent + 1);
+std::any StructItem::accept(ASTVisitor &visitor) {
+    return visitor.visitStructItem(this);
 }
 
-void FunctionParam::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "FunctionParameter\n";
-    binding.print(out, indent + 1);
-    type->print(out, indent + 1);
-}
-
-void SelfParam::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "SelfParam ";
-    if (isBorrowed) {
-        out << '&';
-    }
-    if (lifetime) {
-        out << *lifetime << ' ';
-    }
-    if (isMutable) {
-        out << "mut ";
-    }
-    out << "self\n";
-}
-
-void WhereClauseItem::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "WhereClauseItem\n";
-    if (lifetime) {
-        detail::printIndent(out, indent + 1);
-        out << "Lifetime " << *lifetime << '\n';
-    } else if (type) {
-        detail::printIndent(out, indent + 1);
-        out << "Type\n";
-        type->print(out, indent + 2);
-    }
-    if (!bounds.empty()) {
-        detail::printIndent(out, indent + 1);
-        out << "Bounds";
-        for (const auto &bound : bounds) {
-            out << ' ' << bound;
-        }
-        out << '\n';
-    }
-}
-
-void WhereClause::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "WhereClause\n";
-    for (const auto &item : items) {
-        item.print(out, indent + 1);
-    }
-}
-
-void LifetimeParam::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "LifetimeParam " << lifetime << '\n';
-    if (lifetimeBounds) {
-        detail::printIndent(out, indent + 1);
-        out << "Bounds";
-        for (const auto &bound : *lifetimeBounds) {
-            out << ' ' << bound;
-        }
-        out << '\n';
-    }
-}
-
-void GenericParams::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "GenericParams\n";
-    for (const auto &parameter : params) {
-        parameter.print(out, indent + 1);
-    }
-}
-
-void StructItem::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Struct " << name;
-    out << '\n';
-    for (const auto &attribute : attributes) {
-        attribute.print(out, indent + 1);
-    }
-    if (genericParams) {
-        genericParams->print(out, indent + 1);
-    }
-    if (whereClause) {
-        whereClause->print(out, indent + 1);
-    }
-    for (const auto &field : fields) {
-        field.print(out, indent + 1);
-    }
-}
-
-void Crate::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Crate\n";
-    for (const auto &item : items_) {
-        item->print(out, indent + 1);
-    }
-}
-
-void FunctionItem::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Function " << name << '\n';
-    if (returnType) {
-        detail::printIndent(out, indent + 1);
-        out << "ReturnType\n";
-        returnType->print(out, indent + 2);
-    }
-
-    if (genericParams) {
-        genericParams->print(out, indent + 1);
-    }
-    if (selfParam) {
-        selfParam->print(out, indent + 1);
-    }
-    for (const auto &parameter : parameters) {
-        parameter.print(out, indent + 1);
-    }
-    if (whereClause) {
-        whereClause->print(out, indent + 1);
-    }
-
-    body.print(out, indent + 1);
+std::any FunctionItem::accept(ASTVisitor &visitor) {
+    return visitor.visitFunctionItem(this);
 }
 
 DeriveAttribute::DeriveAttribute(std::vector<DeriveTrait> traits)
     : traits(std::move(traits)) {}
 
-void DeriveAttribute::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "DeriveAttribute\n";
-    for (const auto &trait : traits) {
-        detail::printIndent(out, indent + 1);
-        out << "Trait " << deriveTraitText(trait) << '\n';
-    }
+std::any ConstantItem::accept(ASTVisitor &visitor) {
+    return visitor.visitConstantItem(this);
 }
 
-void Magnitude::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    switch (kind) {
-    case Kind::Integer:
-        out << "Integer " << value << '\n';
-        break;
-    case Kind::Path:
-        out << "Path " << value << '\n';
-        break;
-    }
+std::any ImplItem::accept(ASTVisitor &visitor) {
+    return visitor.visitImplItem(this);
 }
 
-void ConstValue::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    switch (kind) {
-    case Kind::Integer:
-        out << "Integer " << value << '\n';
-        break;
-    case Kind::Boolean:
-        out << "Boolean " << (boolValue ? "true" : "false") << '\n';
-        break;
-    case Kind::Path:
-        out << "Path " << value << '\n';
-        break;
-    case Kind::Negate:
-        out << "Negate\n";
-        operand.print(out, indent + 1);
-        break;
-    }
+std::any UseItem::accept(ASTVisitor &visitor) {
+    return visitor.visitUseItem(this);
 }
 
-void ConstantItem::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Constant " << name << '\n';
-    type->print(out, indent + 1);
-    value.print(out, indent + 1);
+std::any UnitType::accept(ASTVisitor &visitor) {
+    return visitor.visitUnitType(this);
 }
 
-void ImplItem::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Impl\n";
-    typeName->print(out, indent + 1);
-    if (genericParams) {
-        genericParams->print(out, indent + 1);
-    }
-    if (whereClause) {
-        whereClause->print(out, indent + 1);
-    }
-    for (const auto &item : associatedItems) {
-        item->print(out, indent + 1);
-    }
+std::any PathType::accept(ASTVisitor &visitor) {
+    return visitor.visitPathType(this);
 }
 
-void UsePath::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "UsePath\n";
-    if (leadingPathSep) {
-        detail::printIndent(out, indent + 1);
-        out << "LeadingPathSep\n";
-    }
-    for (const auto &segment : segments) {
-        segment.print(out, indent + 1);
-    }
+std::any ReferenceType::accept(ASTVisitor &visitor) {
+    return visitor.visitReferenceType(this);
 }
 
-void UseTree::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    switch (kind) {
-    case Kind::Glob:
-        out << "UseTree Glob\n";
-        break;
-    case Kind::List:
-        out << "UseTree List\n";
-        break;
-    case Kind::Path:
-        out << "UseTree Path\n";
-        break;
-    }
-    if (prefix) {
-        detail::printIndent(out, indent + 1);
-        out << "Prefix\n";
-        prefix->print(out, indent + 2);
-        if (trailingPathSep) {
-            detail::printIndent(out, indent + 2);
-            out << "TrailingPathSep\n";
-        }
-    }
-    if (kind == Kind::List) {
-        detail::printIndent(out, indent + 1);
-        out << "Items {\n";
-        for (const auto &item : items) {
-            item.print(out, indent + 2);
-        }
-        detail::printIndent(out, indent + 1);
-        out << "}\n";
-    }
-    if (kind == Kind::Path) {
-        detail::printIndent(out, indent + 1);
-        out << "Path\n";
-        path.print(out, indent + 2);
-        if (alias || aliasIsUnderscore) {
-            detail::printIndent(out, indent + 1);
-            out << "Alias " << (aliasIsUnderscore ? "_" : *alias) << '\n';
-        }
-    }
-}
-
-void UseItem::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Use\n";
-    tree.print(out, indent + 1);
-}
-
-void Program::print(std::ostream &out) const {
-    out << "Program\n";
-    for (const auto &item : items) {
-        item->print(out, 1);
-    }
+std::any ArrayType::accept(ASTVisitor &visitor) {
+    return visitor.visitArrayType(this);
 }
 
 } // namespace rx::ast
