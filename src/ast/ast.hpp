@@ -5,7 +5,6 @@
 #include <optional>
 #include <ostream>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -60,12 +59,20 @@ enum class DeriveTrait {
     Eq,
 };
 
-std::string_view unaryOpText(UnaryOp op);
-UnaryOp unaryOpFromText(std::string_view text);
-std::string_view binaryOpText(BinaryOp op);
-BinaryOp binaryOpFromText(std::string_view text);
-std::string_view deriveTraitText(DeriveTrait trait);
-DeriveTrait deriveTraitFromText(std::string_view text);
+enum class PathSegmentKind {
+    Ident,
+    SelfValue,
+    SelfType,
+    Super,
+    Crate,
+};
+
+std::string unaryOpText(UnaryOp op);
+UnaryOp unaryOpFromText(const std::string &text);
+std::string binaryOpText(BinaryOp op);
+BinaryOp binaryOpFromText(const std::string &text);
+std::string deriveTraitText(DeriveTrait trait);
+DeriveTrait deriveTraitFromText(const std::string &text);
 
 class ASTNode {
   public:
@@ -83,6 +90,29 @@ using StmtPtr = std::unique_ptr<Stmt>;
 using ExprPtr = std::unique_ptr<Expr>;
 using TypePtr = std::unique_ptr<Type>;
 
+struct ConstValue {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    enum class Kind {
+        Integer,
+        Boolean,
+        Path,
+        Negate,
+    };
+
+    Kind kind;
+    std::string value;
+    bool boolValue = false;
+    std::unique_ptr<ConstValue> operand;
+};
+
+struct PathSegment {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    PathSegmentKind kind = PathSegmentKind::Ident;
+    std::string name;
+};
+
 struct GenericArg {
     void print(std::ostream &out, std::size_t indent) const;
 
@@ -93,7 +123,7 @@ struct GenericArg {
 struct TypePathSegment {
     void print(std::ostream &out, std::size_t indent) const;
 
-    std::string ident;
+    PathSegment ident;
     std::optional<std::vector<GenericArg>> genericArgs;
 };
 
@@ -120,7 +150,7 @@ struct ArrayType final : Type {
     void print(std::ostream &out, std::size_t indent) const override;
 
     TypePtr element;
-    std::string length;
+    ConstValue length;
 };
 
 namespace detail {
@@ -196,10 +226,10 @@ struct NameExpr final : Expr {
 };
 
 struct PathExpr final : Expr {
-    explicit PathExpr(std::vector<std::string> segments);
+    explicit PathExpr(std::vector<PathSegment> segments);
     void print(std::ostream &out, std::size_t indent) const override;
 
-    std::vector<std::string> segments;
+    std::vector<PathSegment> segments;
 };
 
 struct CallExpr final : Expr {
@@ -253,11 +283,11 @@ struct BinaryExpr final : Expr {
 
 struct ArrayExpr final : Expr {
     ArrayExpr(std::vector<ExprPtr> elements,
-              std::optional<std::string> repeatCount = std::nullopt);
+              std::optional<ConstValue> repeatCount = std::nullopt);
     void print(std::ostream &out, std::size_t indent) const override;
 
     std::vector<ExprPtr> elements;
-    std::optional<std::string> repeatCount;
+    std::optional<ConstValue> repeatCount;
 };
 
 struct Parameter {
@@ -405,21 +435,6 @@ struct StructItem final : Item {
     std::optional<WhereClause> whereClause;
 };
 
-struct ConstValue {
-    void print(std::ostream &out, std::size_t indent) const;
-
-    enum class Kind {
-        Integer,
-        Boolean,
-        Path,
-        Negate,
-    };
-
-    Kind kind;
-    std::string value;
-    std::unique_ptr<ConstValue> operand;
-};
-
 struct ConstantItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
@@ -441,7 +456,7 @@ struct UsePath {
     void print(std::ostream &out, std::size_t indent) const;
 
     bool leadingPathSep = false;
-    std::vector<std::string> segments;
+    std::vector<PathSegment> segments;
 };
 
 struct UseTree {
@@ -462,6 +477,7 @@ struct UseTree {
 
     UsePath path;
     std::optional<std::string> alias;
+    bool aliasIsUnderscore = false;
 };
 
 struct UseItem final : Item {

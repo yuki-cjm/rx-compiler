@@ -11,7 +11,7 @@ void invalidOperator() { throw std::logic_error("invalid AST operator"); }
 
 } // namespace
 
-std::string_view unaryOpText(UnaryOp op) {
+std::string unaryOpText(UnaryOp op) {
     switch (op) {
     case UnaryOp::Negate:
         return "-";
@@ -31,7 +31,7 @@ std::string_view unaryOpText(UnaryOp op) {
     invalidOperator();
 }
 
-UnaryOp unaryOpFromText(std::string_view text) {
+UnaryOp unaryOpFromText(const std::string &text) {
     if (text == "-") {
         return UnaryOp::Negate;
     }
@@ -53,10 +53,10 @@ UnaryOp unaryOpFromText(std::string_view text) {
     if (text == "&&mut") {
         return UnaryOp::DoubleBorrowMut;
     }
-    throw std::invalid_argument("unknown unary operator: " + std::string(text));
+    throw std::invalid_argument("unknown unary operator: " + text);
 }
 
-std::string_view binaryOpText(BinaryOp op) {
+std::string binaryOpText(BinaryOp op) {
     switch (op) {
     case BinaryOp::Add:
         return "+";
@@ -120,7 +120,7 @@ std::string_view binaryOpText(BinaryOp op) {
     invalidOperator();
 }
 
-BinaryOp binaryOpFromText(std::string_view text) {
+BinaryOp binaryOpFromText(const std::string &text) {
     if (text == "+") {
         return BinaryOp::Add;
     }
@@ -208,11 +208,10 @@ BinaryOp binaryOpFromText(std::string_view text) {
     if (text == ">>=") {
         return BinaryOp::ShiftRightAssign;
     }
-    throw std::invalid_argument("unknown binary operator: " +
-                                std::string(text));
+    throw std::invalid_argument("unknown binary operator: " + text);
 }
 
-std::string_view deriveTraitText(DeriveTrait trait) {
+std::string deriveTraitText(DeriveTrait trait) {
     switch (trait) {
     case rx::ast::DeriveTrait::Clone:
         return "Clone";
@@ -226,7 +225,7 @@ std::string_view deriveTraitText(DeriveTrait trait) {
     invalidOperator();
 }
 
-DeriveTrait deriveTraitFromText(std::string_view text) {
+DeriveTrait deriveTraitFromText(const std::string &text) {
     if (text == "Copy") {
         return rx::ast::DeriveTrait::Copy;
     } else if (text == "Clone") {
@@ -236,7 +235,7 @@ DeriveTrait deriveTraitFromText(std::string_view text) {
     } else if (text == "Eq") {
         return rx::ast::DeriveTrait::Eq;
     }
-    throw std::invalid_argument("unknown derive trait: " + std::string(text));
+    throw std::invalid_argument("unknown derive trait: " + text);
 }
 
 LiteralExpr::LiteralExpr(std::string value) : value(std::move(value)) {}
@@ -273,15 +272,35 @@ void NameExpr::print(std::ostream &out, std::size_t indent) const {
     out << "Name " << name << '\n';
 }
 
-PathExpr::PathExpr(std::vector<std::string> segments)
+PathExpr::PathExpr(std::vector<PathSegment> segments)
     : segments(std::move(segments)) {}
+
+void PathSegment::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    switch (kind) {
+    case PathSegmentKind::Ident:
+        out << "Ident " << name << '\n';
+        break;
+    case PathSegmentKind::SelfValue:
+        out << "SelfValue\n";
+        break;
+    case PathSegmentKind::SelfType:
+        out << "SelfType\n";
+        break;
+    case PathSegmentKind::Super:
+        out << "Super\n";
+        break;
+    case PathSegmentKind::Crate:
+        out << "Crate\n";
+        break;
+    }
+}
 
 void PathExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Path\n";
     for (const auto &segment : segments) {
-        detail::printIndent(out, indent + 1);
-        out << "Segment " << segment << '\n';
+        segment.print(out, indent + 1);
     }
 }
 
@@ -340,8 +359,7 @@ void GenericArg::print(std::ostream &out, std::size_t indent) const {
 }
 
 void TypePathSegment::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Segment " << ident << '\n';
+    ident.print(out, indent);
     if (genericArgs) {
         detail::printIndent(out, indent + 1);
         out << "GenericArgs\n";
@@ -383,7 +401,8 @@ void ArrayType::print(std::ostream &out, std::size_t indent) const {
     out << "ArrayType\n";
     element->print(out, indent + 1);
     detail::printIndent(out, indent + 1);
-    out << "Length " << length << '\n';
+    out << "Length\n";
+    length.print(out, indent + 2);
 }
 
 CastExpr::CastExpr(ExprPtr operand, TypePtr targetType)
@@ -409,7 +428,7 @@ void BinaryExpr::print(std::ostream &out, std::size_t indent) const {
 }
 
 ArrayExpr::ArrayExpr(std::vector<ExprPtr> elements,
-                     std::optional<std::string> repeatCount)
+                     std::optional<ConstValue> repeatCount)
     : elements(std::move(elements)), repeatCount(std::move(repeatCount)) {}
 
 void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
@@ -420,7 +439,8 @@ void ArrayExpr::print(std::ostream &out, std::size_t indent) const {
     }
     if (repeatCount) {
         detail::printIndent(out, indent + 1);
-        out << "RepeatCount " << *repeatCount << '\n';
+        out << "RepeatCount\n";
+        repeatCount->print(out, indent + 2);
     }
 }
 
@@ -694,7 +714,7 @@ void ConstValue::print(std::ostream &out, std::size_t indent) const {
         out << "Integer " << value << '\n';
         break;
     case Kind::Boolean:
-        out << "Boolean " << value << '\n';
+        out << "Boolean " << (boolValue ? "true" : "false") << '\n';
         break;
     case Kind::Path:
         out << "Path " << value << '\n';
@@ -736,8 +756,7 @@ void UsePath::print(std::ostream &out, std::size_t indent) const {
         out << "LeadingPathSep\n";
     }
     for (const auto &segment : segments) {
-        detail::printIndent(out, indent + 1);
-        out << "Segment " << segment << '\n';
+        segment.print(out, indent + 1);
     }
 }
 
@@ -776,9 +795,9 @@ void UseTree::print(std::ostream &out, std::size_t indent) const {
         detail::printIndent(out, indent + 1);
         out << "Path\n";
         path.print(out, indent + 2);
-        if (alias) {
+        if (alias || aliasIsUnderscore) {
             detail::printIndent(out, indent + 1);
-            out << "Alias " << *alias << '\n';
+            out << "Alias " << (aliasIsUnderscore ? "_" : *alias) << '\n';
         }
     }
 }

@@ -108,10 +108,10 @@ ConstValue buildConstValue(Parser::ConstValueContext *context) {
         value.value = context->INTEGER_LITERAL()->getText();
     } else if (context->TRUE() != nullptr) {
         value.kind = ConstValue::Kind::Boolean;
-        value.value = "true";
+        value.boolValue = true;
     } else if (context->FALSE() != nullptr) {
         value.kind = ConstValue::Kind::Boolean;
-        value.value = "false";
+        value.boolValue = false;
     } else if (context->pathInExpression() != nullptr) {
         value.kind = ConstValue::Kind::Path;
         value.value = context->pathInExpression()->getText();
@@ -125,13 +125,45 @@ ConstValue buildConstValue(Parser::ConstValueContext *context) {
     return value;
 }
 
+PathSegment buildPathIdentSegment(Parser::PathIdentSegmentContext *context) {
+    PathSegment segment;
+    if (context->identifier() != nullptr) {
+        segment.kind = PathSegmentKind::Ident;
+        segment.name = context->identifier()->getText();
+    } else if (context->SELF_VALUE() != nullptr) {
+        segment.kind = PathSegmentKind::SelfValue;
+    } else if (context->SELF_TYPE() != nullptr) {
+        segment.kind = PathSegmentKind::SelfType;
+    } else {
+        unsupported(context);
+    }
+    return segment;
+}
+
+PathSegment buildUsePathSegment(Parser::UsePathSegmentContext *context) {
+    PathSegment segment;
+    if (context->identifier() != nullptr) {
+        segment.kind = PathSegmentKind::Ident;
+        segment.name = context->identifier()->getText();
+    } else if (context->SELF_VALUE() != nullptr) {
+        segment.kind = PathSegmentKind::SelfValue;
+    } else if (context->SUPER() != nullptr) {
+        segment.kind = PathSegmentKind::Super;
+    } else if (context->CRATE() != nullptr) {
+        segment.kind = PathSegmentKind::Crate;
+    } else {
+        unsupported(context);
+    }
+    return segment;
+}
+
 UsePath buildUsePath(Parser::UsePathContext *context) {
     UsePath path;
     path.leadingPathSep =
         context->PATHSEP().size() == context->usePathSegment().size();
     path.segments.reserve(context->usePathSegment().size());
     for (auto *segment : context->usePathSegment()) {
-        path.segments.push_back(segment->getText());
+        path.segments.push_back(buildUsePathSegment(segment));
     }
     return path;
 }
@@ -157,9 +189,11 @@ UseTree buildUseTree(Parser::UseTreeContext *context) {
         tree.kind = UseTree::Kind::Path;
         tree.path = buildUsePath(context->usePath());
         if (context->AS() != nullptr) {
-            tree.alias = context->identifier() != nullptr
-                             ? context->identifier()->getText()
-                             : "_";
+            if (context->identifier() != nullptr) {
+                tree.alias = context->identifier()->getText();
+            } else {
+                tree.aliasIsUnderscore = true;
+            }
         }
     }
 
@@ -190,7 +224,8 @@ TypePtr buildType(Parser::TypeRefContext *context) {
         path->segments.reserve(typePath->typePathSegment().size());
         for (auto *segmentContext : typePath->typePathSegment()) {
             TypePathSegment segment;
-            segment.ident = segmentContext->pathIdentSegment()->getText();
+            segment.ident =
+                buildPathIdentSegment(segmentContext->pathIdentSegment());
             if (auto *genericArgs = segmentContext->genericArgs()) {
                 segment.genericArgs = buildGenericArgs(genericArgs);
             }
@@ -213,7 +248,7 @@ TypePtr buildType(Parser::TypeRefContext *context) {
     if (auto *array = context->arrayType()) {
         auto arrayType = std::make_unique<ArrayType>();
         arrayType->element = buildType(array->typeRef());
-        arrayType->length = array->constValue()->getText();
+        arrayType->length = buildConstValue(array->constValue());
         return arrayType;
     }
 
@@ -238,7 +273,7 @@ TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
     if (auto *array = context->arrayType()) {
         auto arrayType = std::make_unique<ArrayType>();
         arrayType->element = buildType(array->typeRef());
-        arrayType->length = array->constValue()->getText();
+        arrayType->length = buildConstValue(array->constValue());
         return arrayType;
     }
 
@@ -257,14 +292,15 @@ TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
     path->segments.reserve(context->typePathSegment().size() + 1);
     for (auto *segmentContext : context->typePathSegment()) {
         TypePathSegment segment;
-        segment.ident = segmentContext->pathIdentSegment()->getText();
+        segment.ident =
+            buildPathIdentSegment(segmentContext->pathIdentSegment());
         if (auto *genericArgs = segmentContext->genericArgs()) {
             segment.genericArgs = buildGenericArgs(genericArgs);
         }
         path->segments.push_back(std::move(segment));
     }
     TypePathSegment lastSegment;
-    lastSegment.ident = context->pathIdentSegment()->getText();
+    lastSegment.ident = buildPathIdentSegment(context->pathIdentSegment());
     if (auto *genericArgs = context->genericArgs()) {
         lastSegment.genericArgs = buildGenericArgs(genericArgs);
     }
@@ -429,9 +465,10 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
     };
 
     const auto buildPath = [](Parser::PathInExpressionContext *path) {
-        std::vector<std::string> segments;
+        std::vector<PathSegment> segments;
         for (auto *segment : path->pathExprSegment()) {
-            segments.push_back(segment->getText());
+            segments.push_back(
+                buildPathIdentSegment(segment->pathIdentSegment()));
         }
         return PathExpr(std::move(segments));
     };
@@ -1826,12 +1863,12 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
             elements.push_back(buildExpr(element));
         }
 
-        std::optional<std::string> repeatCount;
+        std::optional<ConstValue> repeatCount;
         if (array->SEMI() != nullptr) {
             if (array->constValue() == nullptr || elements.size() != 1) {
                 unsupported(context);
             }
-            repeatCount = array->constValue()->getText();
+            repeatCount = buildConstValue(array->constValue());
         }
         return std::make_unique<ArrayExpr>(std::move(elements),
                                            std::move(repeatCount));
