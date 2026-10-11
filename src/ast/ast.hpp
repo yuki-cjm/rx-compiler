@@ -75,14 +75,53 @@ class ASTNode {
 
 class Item : public ASTNode {};
 class Stmt : public ASTNode {};
-class Expr : public ASTNode {
-  public:
-    void print(std::ostream &out, std::size_t indent = 0) const override = 0;
-};
+class Expr : public ASTNode {};
+class Type : public ASTNode {};
 
 using ItemPtr = std::unique_ptr<Item>;
 using StmtPtr = std::unique_ptr<Stmt>;
 using ExprPtr = std::unique_ptr<Expr>;
+using TypePtr = std::unique_ptr<Type>;
+
+struct GenericArg {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::optional<std::string> lifetime;
+    TypePtr type;
+};
+
+struct TypePathSegment {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    std::string ident;
+    std::optional<std::vector<GenericArg>> genericArgs;
+};
+
+struct UnitType final : Type {
+    void print(std::ostream &out, std::size_t indent) const override;
+};
+
+struct PathType final : Type {
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    std::vector<TypePathSegment> segments;
+};
+
+struct ReferenceType final : Type {
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    bool isDouble = false;
+    std::optional<std::string> lifetime;
+    bool isMutable = false;
+    TypePtr inner;
+};
+
+struct ArrayType final : Type {
+    void print(std::ostream &out, std::size_t indent) const override;
+
+    TypePtr element;
+    std::string length;
+};
 
 namespace detail {
 
@@ -113,7 +152,7 @@ struct LetStmt : public Stmt {
     void print(std::ostream &out, std::size_t indent) const override;
 
     std::string name;
-    std::optional<std::string> type;
+    TypePtr type;
     ExprPtr initializer;
 };
 
@@ -196,11 +235,11 @@ struct UnaryExpr final : Expr {
 };
 
 struct CastExpr final : Expr {
-    CastExpr(ExprPtr operand, std::string targetType);
+    CastExpr(ExprPtr operand, TypePtr targetType);
     void print(std::ostream &out, std::size_t indent) const override;
 
     ExprPtr operand;
-    std::string targetType;
+    TypePtr targetType;
 };
 
 struct BinaryExpr final : Expr {
@@ -223,7 +262,7 @@ struct ArrayExpr final : Expr {
 
 struct Parameter {
     std::string name;
-    std::string type;
+    TypePtr type;
 };
 
 struct SelfParam {
@@ -238,7 +277,7 @@ struct WhereClauseItem {
     void print(std::ostream &out, std::size_t indent) const;
 
     std::optional<std::string> lifetime;
-    std::optional<std::string> type;
+    TypePtr type;
     std::vector<std::string> bounds;
 };
 
@@ -330,11 +369,11 @@ struct StructExpr final : Expr {
 };
 
 struct StructField {
-    StructField(std::string name, std::string type);
+    StructField(std::string name, TypePtr type);
     void print(std::ostream &out, std::size_t indent) const;
 
     std::string name;
-    std::string type;
+    TypePtr type;
 };
 
 struct FunctionItem final : Item {
@@ -344,7 +383,7 @@ struct FunctionItem final : Item {
     std::optional<GenericParam> genericParams;
     std::optional<SelfParam> selfParam;
     std::vector<Parameter> parameters;
-    std::optional<std::string> returnType;
+    TypePtr returnType;
     std::optional<WhereClause> whereClause;
     BlockExpr body;
 };
@@ -385,14 +424,14 @@ struct ConstantItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
     std::string name;
-    std::string type;
+    TypePtr type;
     ConstValue value;
 };
 
 struct ImplItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
-    std::string typeName;
+    TypePtr typeName;
     std::optional<GenericParam> genericParams;
     std::optional<WhereClause> whereClause;
     std::vector<ItemPtr> associatedItems;

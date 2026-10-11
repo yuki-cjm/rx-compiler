@@ -25,6 +25,8 @@ ruleChildren(antlr4::ParserRuleContext *context) {
     return result;
 }
 
+TypePtr buildType(Parser::TypeRefContext *context);
+
 GenericParam buildGenericParams(Parser::GenericParamsContext *context) {
     GenericParam genericParams;
     genericParams.params.reserve(context->lifetimeParam().size());
@@ -61,7 +63,7 @@ WhereClause buildWhereClause(Parser::WhereClauseContext *context) {
                 }
             }
         } else if (auto *type = itemContext->typeRef()) {
-            item.type = type->getText();
+            item.type = buildType(type);
             if (auto *bounds = itemContext->typeParamBounds()) {
                 item.bounds.reserve(bounds->lifetime().size());
                 for (auto *bound : bounds->lifetime()) {
@@ -164,6 +166,112 @@ UseTree buildUseTree(Parser::UseTreeContext *context) {
     return tree;
 }
 
+std::vector<GenericArg>
+buildGenericArgs(Parser::GenericArgsContext *genericArgs) {
+    std::vector<GenericArg> args;
+    args.reserve(genericArgs->genericArg().size());
+    for (auto *argContext : genericArgs->genericArg()) {
+        GenericArg arg;
+        if (argContext->lifetime() != nullptr) {
+            arg.lifetime = argContext->lifetime()->getText();
+        } else if (argContext->typeRef() != nullptr) {
+            arg.type = buildType(argContext->typeRef());
+        } else {
+            unsupported(argContext);
+        }
+        args.push_back(std::move(arg));
+    }
+    return args;
+}
+
+TypePtr buildType(Parser::TypeRefContext *context) {
+    if (auto *typePath = context->typePath()) {
+        auto path = std::make_unique<PathType>();
+        path->segments.reserve(typePath->typePathSegment().size());
+        for (auto *segmentContext : typePath->typePathSegment()) {
+            TypePathSegment segment;
+            segment.ident = segmentContext->pathIdentSegment()->getText();
+            if (auto *genericArgs = segmentContext->genericArgs()) {
+                segment.genericArgs = buildGenericArgs(genericArgs);
+            }
+            path->segments.push_back(std::move(segment));
+        }
+        return path;
+    }
+
+    if (auto *reference = context->referenceType()) {
+        auto referenceType = std::make_unique<ReferenceType>();
+        referenceType->isDouble = reference->ANDAND() != nullptr;
+        referenceType->isMutable = reference->MUT() != nullptr;
+        if (auto *lifetime = reference->lifetime()) {
+            referenceType->lifetime = lifetime->getText();
+        }
+        referenceType->inner = buildType(reference->typeRef());
+        return referenceType;
+    }
+
+    if (auto *array = context->arrayType()) {
+        auto arrayType = std::make_unique<ArrayType>();
+        arrayType->element = buildType(array->typeRef());
+        arrayType->length = array->constValue()->getText();
+        return arrayType;
+    }
+
+    if (context->LPAREN() != nullptr) {
+        if (auto *inner = context->typeRef()) {
+            return buildType(inner);
+        }
+        return std::make_unique<UnitType>();
+    }
+
+    unsupported(context);
+}
+
+TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
+    if (context->LPAREN() != nullptr) {
+        if (auto *inner = context->typeRef()) {
+            return buildType(inner);
+        }
+        return std::make_unique<UnitType>();
+    }
+
+    if (auto *array = context->arrayType()) {
+        auto arrayType = std::make_unique<ArrayType>();
+        arrayType->element = buildType(array->typeRef());
+        arrayType->length = array->constValue()->getText();
+        return arrayType;
+    }
+
+    if (context->AMP() != nullptr || context->ANDAND() != nullptr) {
+        auto referenceType = std::make_unique<ReferenceType>();
+        referenceType->isDouble = context->ANDAND() != nullptr;
+        referenceType->isMutable = context->MUT() != nullptr;
+        if (auto *lifetime = context->lifetime()) {
+            referenceType->lifetime = lifetime->getText();
+        }
+        referenceType->inner = buildClosedCastType(context->closedCastType());
+        return referenceType;
+    }
+
+    auto path = std::make_unique<PathType>();
+    path->segments.reserve(context->typePathSegment().size() + 1);
+    for (auto *segmentContext : context->typePathSegment()) {
+        TypePathSegment segment;
+        segment.ident = segmentContext->pathIdentSegment()->getText();
+        if (auto *genericArgs = segmentContext->genericArgs()) {
+            segment.genericArgs = buildGenericArgs(genericArgs);
+        }
+        path->segments.push_back(std::move(segment));
+    }
+    TypePathSegment lastSegment;
+    lastSegment.ident = context->pathIdentSegment()->getText();
+    if (auto *genericArgs = context->genericArgs()) {
+        lastSegment.genericArgs = buildGenericArgs(genericArgs);
+    }
+    path->segments.push_back(std::move(lastSegment));
+    return path;
+}
+
 } // namespace
 
 Program AstBuilder::build(Parser::CrateContext *crate) const {
@@ -183,7 +291,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
                 item.genericParams = buildGenericParams(genericParams);
             }
             if (auto *returnType = function->typeRef()) {
-                item.returnType = returnType->getText();
+                item.returnType = buildType(returnType);
             }
             if (auto *parameters = function->functionParameters()) {
                 if (auto *selfParam = parameters->selfParam()) {
@@ -198,7 +306,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
                 for (auto *parameter : parameters->functionParam()) {
                     item.parameters.push_back(
                         {parameter->identifierBinding()->getText(),
-                         parameter->typeRef()->getText()});
+                         buildType(parameter->typeRef())});
                 }
             }
             if (auto *whereClause = function->whereClause()) {
@@ -212,7 +320,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
     const auto buildConstantItem = [](Parser::ConstantItemContext *constant) {
         ConstantItem item;
         item.name = constant->identifier()->getText();
-        item.type = constant->typeRef()->getText();
+        item.type = buildType(constant->typeRef());
         item.value = buildConstValue(constant->constValue());
         return item;
     };
@@ -237,7 +345,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
         }
         for (auto *field : structure->structField()) {
             item.fields.emplace_back(field->identifier()->getText(),
-                                     field->typeRef()->getText());
+                                     buildType(field->typeRef()));
         }
         if (auto *whereClause = structure->whereClause()) {
             item.whereClause = buildWhereClause(whereClause);
@@ -251,7 +359,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
 
     if (auto *implementation = context->inherentImpl()) {
         ImplItem item;
-        item.typeName = implementation->typeRef()->getText();
+        item.typeName = buildType(implementation->typeRef());
         if (auto *genericParams = implementation->genericParams()) {
             item.genericParams = buildGenericParams(genericParams);
         }
@@ -286,7 +394,7 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
         auto statement = std::make_unique<LetStmt>();
         statement->name = let->identifierBinding()->getText();
         if (auto *type = let->typeRef()) {
-            statement->type = type->getText();
+            statement->type = buildType(type);
         }
         statement->initializer = buildExpr(let->expression());
         return statement;
@@ -558,7 +666,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
 
         for (auto *targetType : targetTypes) {
             result = std::make_unique<CastExpr>(std::move(result),
-                                                targetType->getText());
+                                                buildType(targetType));
         }
         return result;
     }
@@ -1160,7 +1268,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
         }
         return std::make_unique<CastExpr>(
             buildExpr(closedCast->castExpression()),
-            closedCast->closedCastType()->getText());
+            buildClosedCastType(closedCast->closedCastType()));
     }
 
     if (context->getRuleIndex() == Parser::RuleConditionClosedCastExpression) {
@@ -1172,7 +1280,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
         }
         return std::make_unique<CastExpr>(
             buildExpr(closedCast->conditionCastExpression()),
-            closedCast->closedCastType()->getText());
+            buildClosedCastType(closedCast->closedCastType()));
     }
 
     if (context->getRuleIndex() ==
@@ -1185,7 +1293,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
         }
         return std::make_unique<CastExpr>(
             buildExpr(closedCast->conditionBreakCastExpression()),
-            closedCast->closedCastType()->getText());
+            buildClosedCastType(closedCast->closedCastType()));
     }
 
     if (context->getRuleIndex() == Parser::RuleStatementClosedCastExpression) {
@@ -1201,7 +1309,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
         }
         return std::make_unique<CastExpr>(
             buildExpr(closedCast->statementCastExpression()),
-            closedCast->closedCastType()->getText());
+            buildClosedCastType(closedCast->closedCastType()));
     }
 
     if (context->getRuleIndex() == Parser::RuleShiftExpression ||

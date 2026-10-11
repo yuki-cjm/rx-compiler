@@ -329,13 +329,73 @@ void UnaryExpr::print(std::ostream &out, std::size_t indent) const {
     operand->print(out, indent + 1);
 }
 
-CastExpr::CastExpr(ExprPtr operand, std::string targetType)
+void GenericArg::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    if (lifetime) {
+        out << "Lifetime " << *lifetime << '\n';
+    } else {
+        out << "Type\n";
+        type->print(out, indent + 1);
+    }
+}
+
+void TypePathSegment::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Segment " << ident << '\n';
+    if (genericArgs) {
+        detail::printIndent(out, indent + 1);
+        out << "GenericArgs\n";
+        for (const auto &arg : *genericArgs) {
+            arg.print(out, indent + 2);
+        }
+    }
+}
+
+void UnitType::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "UnitType\n";
+}
+
+void PathType::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "PathType\n";
+    for (const auto &segment : segments) {
+        segment.print(out, indent + 1);
+    }
+}
+
+void ReferenceType::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "ReferenceType";
+    out << (isDouble ? " &&" : " &");
+    if (lifetime) {
+        out << ' ' << *lifetime;
+    }
+    if (isMutable) {
+        out << " mut";
+    }
+    out << '\n';
+    inner->print(out, indent + 1);
+}
+
+void ArrayType::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "ArrayType\n";
+    element->print(out, indent + 1);
+    detail::printIndent(out, indent + 1);
+    out << "Length " << length << '\n';
+}
+
+CastExpr::CastExpr(ExprPtr operand, TypePtr targetType)
     : operand(std::move(operand)), targetType(std::move(targetType)) {}
 
 void CastExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Cast as " << targetType << '\n';
+    out << "Cast\n";
     operand->print(out, indent + 1);
+    detail::printIndent(out, indent + 1);
+    out << "Type\n";
+    targetType->print(out, indent + 2);
 }
 
 BinaryExpr::BinaryExpr(BinaryOp op, ExprPtr left, ExprPtr right)
@@ -369,11 +429,12 @@ BlockExpr::BlockExpr(std::vector<StmtPtr> statements, ExprPtr tail)
 
 void LetStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Let " << name;
+    out << "Let " << name << '\n';
     if (type) {
-        out << ": " << *type;
+        detail::printIndent(out, indent + 1);
+        out << "Type\n";
+        type->print(out, indent + 2);
     }
-    out << '\n';
     initializer->print(out, indent + 1);
 }
 
@@ -487,12 +548,13 @@ void StructExpr::print(std::ostream &out, std::size_t indent) const {
     out << "}\n";
 }
 
-StructField::StructField(std::string name, std::string type)
+StructField::StructField(std::string name, TypePtr type)
     : name(std::move(name)), type(std::move(type)) {}
 
 void StructField::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << name << ": " << type << '\n';
+    out << name << '\n';
+    type->print(out, indent + 1);
 }
 
 void SelfParam::print(std::ostream &out, std::size_t indent) const {
@@ -518,7 +580,8 @@ void WhereClauseItem::print(std::ostream &out, std::size_t indent) const {
         out << "Lifetime " << *lifetime << '\n';
     } else if (type) {
         detail::printIndent(out, indent + 1);
-        out << "Type " << *type << '\n';
+        out << "Type\n";
+        type->print(out, indent + 2);
     }
     if (!bounds.empty()) {
         detail::printIndent(out, indent + 1);
@@ -587,11 +650,12 @@ void Crate::print(std::ostream &out, std::size_t indent) const {
 
 void FunctionItem::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Function " << name;
+    out << "Function " << name << '\n';
     if (returnType) {
-        out << " -> " << *returnType;
+        detail::printIndent(out, indent + 1);
+        out << "ReturnType\n";
+        returnType->print(out, indent + 2);
     }
-    out << '\n';
 
     if (genericParams) {
         genericParams->print(out, indent + 1);
@@ -601,7 +665,8 @@ void FunctionItem::print(std::ostream &out, std::size_t indent) const {
     }
     for (const auto &parameter : parameters) {
         detail::printIndent(out, indent + 1);
-        out << "Parameter " << parameter.name << ": " << parameter.type << '\n';
+        out << "Parameter " << parameter.name << '\n';
+        parameter.type->print(out, indent + 2);
     }
     if (whereClause) {
         whereClause->print(out, indent + 1);
@@ -643,13 +708,15 @@ void ConstValue::print(std::ostream &out, std::size_t indent) const {
 
 void ConstantItem::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Constant " << name << ": " << type << '\n';
+    out << "Constant " << name << '\n';
+    type->print(out, indent + 1);
     value.print(out, indent + 1);
 }
 
 void ImplItem::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Impl " << typeName << '\n';
+    out << "Impl\n";
+    typeName->print(out, indent + 1);
     if (genericParams) {
         genericParams->print(out, indent + 1);
     }
