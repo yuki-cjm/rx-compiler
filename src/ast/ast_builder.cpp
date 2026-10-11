@@ -123,6 +123,47 @@ ConstValue buildConstValue(Parser::ConstValueContext *context) {
     return value;
 }
 
+UsePath buildUsePath(Parser::UsePathContext *context) {
+    UsePath path;
+    path.leadingPathSep =
+        context->PATHSEP().size() == context->usePathSegment().size();
+    path.segments.reserve(context->usePathSegment().size());
+    for (auto *segment : context->usePathSegment()) {
+        path.segments.push_back(segment->getText());
+    }
+    return path;
+}
+
+UseTree buildUseTree(Parser::UseTreeContext *context) {
+    UseTree tree;
+
+    if (context->STAR() != nullptr || context->LBRACE() != nullptr) {
+        tree.kind = context->STAR() != nullptr ? UseTree::Kind::Glob
+                                               : UseTree::Kind::List;
+
+        if (context->PATHSEP() != nullptr) {
+            tree.trailingPathSep = true;
+            tree.prefix = context->usePath() != nullptr
+                              ? buildUsePath(context->usePath())
+                              : UsePath{};
+        }
+
+        for (auto *item : context->useTree()) {
+            tree.items.push_back(buildUseTree(item));
+        }
+    } else {
+        tree.kind = UseTree::Kind::Path;
+        tree.path = buildUsePath(context->usePath());
+        if (context->AS() != nullptr) {
+            tree.alias = context->identifier() != nullptr
+                             ? context->identifier()->getText()
+                             : "_";
+        }
+    }
+
+    return tree;
+}
+
 } // namespace
 
 Program AstBuilder::build(Parser::CrateContext *crate) const {
@@ -229,6 +270,12 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
             }
         }
         return std::make_unique<ImplItem>(std::move(item));
+    }
+
+    if (auto *use = context->useDeclaration()) {
+        UseItem item;
+        item.tree = buildUseTree(use->useTree());
+        return std::make_unique<UseItem>(std::move(item));
     }
 
     unsupported(context);

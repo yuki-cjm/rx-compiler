@@ -661,6 +661,67 @@ void ImplItem::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+void UsePath::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "UsePath\n";
+    if (leadingPathSep) {
+        detail::printIndent(out, indent + 1);
+        out << "LeadingPathSep\n";
+    }
+    for (const auto &segment : segments) {
+        detail::printIndent(out, indent + 1);
+        out << "Segment " << segment << '\n';
+    }
+}
+
+void UseTree::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    switch (kind) {
+    case Kind::Glob:
+        out << "UseTree Glob\n";
+        break;
+    case Kind::List:
+        out << "UseTree List\n";
+        break;
+    case Kind::Path:
+        out << "UseTree Path\n";
+        break;
+    }
+    if (prefix) {
+        detail::printIndent(out, indent + 1);
+        out << "Prefix\n";
+        prefix->print(out, indent + 2);
+        if (trailingPathSep) {
+            detail::printIndent(out, indent + 2);
+            out << "TrailingPathSep\n";
+        }
+    }
+    if (kind == Kind::List) {
+        detail::printIndent(out, indent + 1);
+        out << "Items {\n";
+        for (const auto &item : items) {
+            item.print(out, indent + 2);
+        }
+        detail::printIndent(out, indent + 1);
+        out << "}\n";
+    }
+    if (kind == Kind::Path) {
+        detail::printIndent(out, indent + 1);
+        out << "Path\n";
+        path.print(out, indent + 2);
+        if (alias) {
+            detail::printIndent(out, indent + 1);
+            out << "Alias " << *alias << '\n';
+        }
+    }
+}
+
+void UseItem::print(std::ostream &out, std::size_t indent) const {
+    detail::printIndent(out, indent);
+    out << "Use\n";
+    tree.print(out, indent + 1);
+}
+
 void Program::print(std::ostream &out) const {
     out << "Program\n";
     for (const auto &item : items) {

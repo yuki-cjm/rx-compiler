@@ -398,6 +398,39 @@ struct ImplItem final : Item {
     std::vector<ItemPtr> associatedItems;
 };
 
+struct UsePath {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    bool leadingPathSep = false;
+    std::vector<std::string> segments;
+};
+
+struct UseTree {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    enum class Kind {
+        Glob,
+        List,
+        Path,
+    };
+
+    Kind kind;
+
+    std::optional<UsePath> prefix;
+    bool trailingPathSep = false;
+
+    std::vector<UseTree> items;
+
+    UsePath path;
+    std::optional<std::string> alias;
+};
+
+struct UseItem final : Item {
+    void print(std::ostream &out, std::size_t indent = 0) const override;
+
+    UseTree tree;
+};
+
 struct Program {
     std::vector<ItemPtr> items;
 
