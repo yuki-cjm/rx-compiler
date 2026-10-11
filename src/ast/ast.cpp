@@ -79,7 +79,7 @@ std::string binaryOpText(BinaryOp op) {
     case BinaryOp::BitwiseOr:
         return "|";
     case BinaryOp::Less:
-        return "<";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+        return "<";
     case BinaryOp::LessEqual:
         return "<=";
     case BinaryOp::Greater:
@@ -238,13 +238,6 @@ DeriveTrait deriveTraitFromText(const std::string &text) {
     throw std::invalid_argument("unknown derive trait: " + text);
 }
 
-LiteralExpr::LiteralExpr(std::string value) : value(std::move(value)) {}
-
-void LiteralExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Literal " << value << '\n';
-}
-
 IntegerLiteralExpr::IntegerLiteralExpr(std::string value)
     : value(std::move(value)) {}
 
@@ -265,14 +258,7 @@ void UnitExpr::print(std::ostream &out, std::size_t indent) const {
     out << "Unit\n";
 }
 
-NameExpr::NameExpr(std::string name) : name(std::move(name)) {}
-
-void NameExpr::print(std::ostream &out, std::size_t indent) const {
-    detail::printIndent(out, indent);
-    out << "Name " << name << '\n';
-}
-
-PathExpr::PathExpr(std::vector<PathSegment> segments)
+PathInExpr::PathInExpr(std::vector<PathExprSegment> segments)
     : segments(std::move(segments)) {}
 
 void PathSegment::print(std::ostream &out, std::size_t indent) const {
@@ -296,7 +282,7 @@ void PathSegment::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
-void PathExpr::print(std::ostream &out, std::size_t indent) const {
+void PathInExpr::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Path\n";
     for (const auto &segment : segments) {
@@ -369,6 +355,17 @@ void TypePathSegment::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
+void PathExprSegment::print(std::ostream &out, std::size_t indent) const {
+    ident.print(out, indent);
+    if (genericArgs) {
+        detail::printIndent(out, indent + 1);
+        out << "GenericArgs\n";
+        for (const auto &arg : *genericArgs) {
+            arg.print(out, indent + 2);
+        }
+    }
+}
+
 void UnitType::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "UnitType\n";
@@ -384,8 +381,7 @@ void PathType::print(std::ostream &out, std::size_t indent) const {
 
 void ReferenceType::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "ReferenceType";
-    out << (isDouble ? " &&" : " &");
+    out << "ReferenceType &";
     if (lifetime) {
         out << ' ' << *lifetime;
     }
@@ -449,7 +445,7 @@ BlockExpr::BlockExpr(std::vector<StmtPtr> statements, ExprPtr tail)
 
 void LetStmt::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
-    out << "Let " << name << '\n';
+    out << "Let " << (isMutable ? "mut " : "") << name << '\n';
     if (type) {
         detail::printIndent(out, indent + 1);
         out << "Type\n";
@@ -552,7 +548,7 @@ void StructExprField::print(std::ostream &out, std::size_t indent) const {
     value->print(out, indent + 1);
 }
 
-StructExpr::StructExpr(PathExpr path, std::vector<StructExprField> fields)
+StructExpr::StructExpr(PathInExpr path, std::vector<StructExprField> fields)
     : path(std::move(path)), fields(std::move(fields)) {}
 
 void StructExpr::print(std::ostream &out, std::size_t indent) const {
@@ -685,7 +681,8 @@ void FunctionItem::print(std::ostream &out, std::size_t indent) const {
     }
     for (const auto &parameter : parameters) {
         detail::printIndent(out, indent + 1);
-        out << "Parameter " << parameter.name << '\n';
+        out << "Parameter " << (parameter.isMutable ? "mut " : "")
+            << parameter.name << '\n';
         parameter.type->print(out, indent + 2);
     }
     if (whereClause) {

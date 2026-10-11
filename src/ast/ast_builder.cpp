@@ -218,6 +218,22 @@ buildGenericArgs(Parser::GenericArgsContext *genericArgs) {
     return args;
 }
 
+TypePtr buildReferenceType(bool isDouble,
+                           const std::optional<std::string> &lifetime,
+                           bool isMutable, TypePtr inner) {
+    auto innerReference = std::make_unique<ReferenceType>();
+    innerReference->lifetime = lifetime;
+    innerReference->isMutable = isMutable;
+    innerReference->inner = std::move(inner);
+
+    if (isDouble) {
+        auto outer = std::make_unique<ReferenceType>();
+        outer->inner = std::move(innerReference);
+        return outer;
+    }
+    return innerReference;
+}
+
 TypePtr buildType(Parser::TypeRefContext *context) {
     if (auto *typePath = context->typePath()) {
         auto path = std::make_unique<PathType>();
@@ -235,14 +251,13 @@ TypePtr buildType(Parser::TypeRefContext *context) {
     }
 
     if (auto *reference = context->referenceType()) {
-        auto referenceType = std::make_unique<ReferenceType>();
-        referenceType->isDouble = reference->ANDAND() != nullptr;
-        referenceType->isMutable = reference->MUT() != nullptr;
-        if (auto *lifetime = reference->lifetime()) {
-            referenceType->lifetime = lifetime->getText();
+        std::optional<std::string> lifetime;
+        if (auto *lifetimeContext = reference->lifetime()) {
+            lifetime = lifetimeContext->getText();
         }
-        referenceType->inner = buildType(reference->typeRef());
-        return referenceType;
+        return buildReferenceType(reference->ANDAND() != nullptr, lifetime,
+                                  reference->MUT() != nullptr,
+                                  buildType(reference->typeRef()));
     }
 
     if (auto *array = context->arrayType()) {
@@ -260,6 +275,7 @@ TypePtr buildType(Parser::TypeRefContext *context) {
     }
 
     unsupported(context);
+    return nullptr;
 }
 
 TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
@@ -278,14 +294,13 @@ TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
     }
 
     if (context->AMP() != nullptr || context->ANDAND() != nullptr) {
-        auto referenceType = std::make_unique<ReferenceType>();
-        referenceType->isDouble = context->ANDAND() != nullptr;
-        referenceType->isMutable = context->MUT() != nullptr;
-        if (auto *lifetime = context->lifetime()) {
-            referenceType->lifetime = lifetime->getText();
+        std::optional<std::string> lifetime;
+        if (auto *lifetimeContext = context->lifetime()) {
+            lifetime = lifetimeContext->getText();
         }
-        referenceType->inner = buildClosedCastType(context->closedCastType());
-        return referenceType;
+        return buildReferenceType(
+            context->ANDAND() != nullptr, lifetime, context->MUT() != nullptr,
+            buildClosedCastType(context->closedCastType()));
     }
 
     auto path = std::make_unique<PathType>();
@@ -340,9 +355,12 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
                     item.selfParam = std::move(self);
                 }
                 for (auto *parameter : parameters->functionParam()) {
-                    item.parameters.push_back(
-                        {parameter->identifierBinding()->getText(),
-                         buildType(parameter->typeRef())});
+                    auto *binding = parameter->identifierBinding();
+                    Parameter built;
+                    built.name = binding->identifier()->getText();
+                    built.isMutable = binding->MUT() != nullptr;
+                    built.type = buildType(parameter->typeRef());
+                    item.parameters.push_back(std::move(built));
                 }
             }
             if (auto *whereClause = function->whereClause()) {
@@ -423,12 +441,14 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
     }
 
     unsupported(context);
+    return nullptr;
 }
 
 StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     if (auto *let = context->letStatement()) {
         auto statement = std::make_unique<LetStmt>();
-        statement->name = let->identifierBinding()->getText();
+        statement->name = let->identifierBinding()->identifier()->getText();
+        statement->isMutable = let->identifierBinding()->MUT() != nullptr;
         if (auto *type = let->typeRef()) {
             statement->type = buildType(type);
         }
@@ -449,6 +469,7 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     }
 
     unsupported(context);
+    return nullptr;
 }
 
 ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
@@ -465,12 +486,16 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
     };
 
     const auto buildPath = [](Parser::PathInExpressionContext *path) {
-        std::vector<PathSegment> segments;
+        std::vector<PathExprSegment> segments;
         for (auto *segment : path->pathExprSegment()) {
-            segments.push_back(
-                buildPathIdentSegment(segment->pathIdentSegment()));
+            PathExprSegment result;
+            result.ident = buildPathIdentSegment(segment->pathIdentSegment());
+            if (auto *genericArgs = segment->genericArgs()) {
+                result.genericArgs = buildGenericArgs(genericArgs);
+            }
+            segments.push_back(std::move(result));
         }
-        return PathExpr(std::move(segments));
+        return PathInExpr(std::move(segments));
     };
 
     const auto buildExpressionWithBlock =
@@ -499,6 +524,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
             return buildExpr(expression->blockExpression());
         }
         unsupported(expression);
+        return nullptr;
     };
 
     const auto buildUnary = [this](antlr4::ParserRuleContext *operatorContext,
@@ -773,9 +799,8 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
 
     if (context->getRuleIndex() ==
         Parser::RuleConditionBreakMultiplicativeExpression) {
-        auto *multiplicative =
-            dynamic_cast<Parser::ConditionBreakMultiplicativeExpressionContext *>(
-                context);
+        auto *multiplicative = dynamic_cast<
+            Parser::ConditionBreakMultiplicativeExpressionContext *>(context);
         const auto operands = multiplicative->conditionCastExpression();
         const auto operators = multiplicative->multiplicativeOperator();
 
@@ -794,9 +819,9 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
             Parser::RuleConditionPrimaryWithoutBareBlock) {
         auto *primary = dynamic_cast<Parser::NonBlockPrimaryContext *>(context);
         if (primary != nullptr && primary->pathInExpression() != nullptr) {
-            PathExpr path = buildPath(primary->pathInExpression());
+            PathInExpr path = buildPath(primary->pathInExpression());
             if (primary->LBRACE() == nullptr) {
-                return std::make_unique<PathExpr>(std::move(path));
+                return std::make_unique<PathInExpr>(std::move(path));
             }
 
             std::vector<StructExprField> fields;
@@ -898,7 +923,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
 
     if (context->getRuleIndex() == Parser::RulePathInExpression) {
         auto *path = dynamic_cast<Parser::PathInExpressionContext *>(context);
-        return std::make_unique<PathExpr>(buildPath(path));
+        return std::make_unique<PathInExpr>(buildPath(path));
     }
 
     if (context->getRuleIndex() == Parser::RuleAdditiveExpression) {
@@ -1229,8 +1254,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
             }
 
             const auto ruleIndex = rule->getRuleIndex();
-            if (ruleIndex ==
-                    Parser::RuleConditionBreakClosedCastExpression ||
+            if (ruleIndex == Parser::RuleConditionBreakClosedCastExpression ||
                 ruleIndex == Parser::RuleConditionBreakCastExpression ||
                 ruleIndex == Parser::RuleConditionCastExpression ||
                 ruleIndex == Parser::RuleConditionClosedCastExpression) {
@@ -1388,7 +1412,8 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
                 ruleIndex == Parser::RuleConditionAdditiveExpression ||
                 ruleIndex == Parser::RuleConditionClosedAdditiveExpression ||
                 ruleIndex == Parser::RuleConditionBreakAdditiveExpression ||
-                ruleIndex == Parser::RuleConditionBreakClosedAdditiveExpression) {
+                ruleIndex ==
+                    Parser::RuleConditionBreakClosedAdditiveExpression) {
                 ExprPtr operand = buildExpr(rule);
 
                 if (!result) {
@@ -1764,7 +1789,8 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
             if (childRuleIndex == Parser::RuleLogicalAndExpression ||
                 childRuleIndex == Parser::RuleStatementLogicalAndExpression ||
                 childRuleIndex == Parser::RuleConditionLogicalAndExpression ||
-                childRuleIndex == Parser::RuleConditionBreakLogicalAndExpression) {
+                childRuleIndex ==
+                    Parser::RuleConditionBreakLogicalAndExpression) {
                 if (!operands.empty() && !pendingOr) {
                     unsupported(context);
                 }
@@ -1907,7 +1933,7 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
 
     unsupported(context);
 
-    return std::make_unique<UnitExpr>();
+    return nullptr;
 }
 
 } // namespace rx::ast

@@ -127,6 +127,13 @@ struct TypePathSegment {
     std::optional<std::vector<GenericArg>> genericArgs;
 };
 
+struct PathExprSegment {
+    void print(std::ostream &out, std::size_t indent) const;
+
+    PathSegment ident;
+    std::optional<std::vector<GenericArg>> genericArgs;
+};
+
 struct UnitType final : Type {
     void print(std::ostream &out, std::size_t indent) const override;
 };
@@ -140,7 +147,6 @@ struct PathType final : Type {
 struct ReferenceType final : Type {
     void print(std::ostream &out, std::size_t indent) const override;
 
-    bool isDouble = false;
     std::optional<std::string> lifetime;
     bool isMutable = false;
     TypePtr inner;
@@ -182,6 +188,7 @@ struct LetStmt : public Stmt {
     void print(std::ostream &out, std::size_t indent) const override;
 
     std::string name;
+    bool isMutable = false;
     TypePtr type;
     ExprPtr initializer;
 };
@@ -191,13 +198,6 @@ struct ExprStmt : public Stmt {
     void print(std::ostream &out, std::size_t indent) const override;
 
     ExprPtr expression;
-};
-
-struct LiteralExpr final : Expr {
-    explicit LiteralExpr(std::string value);
-    void print(std::ostream &out, std::size_t indent) const override;
-
-    std::string value;
 };
 
 struct IntegerLiteralExpr final : Expr {
@@ -218,18 +218,11 @@ struct UnitExpr final : Expr {
     void print(std::ostream &out, std::size_t indent) const override;
 };
 
-struct NameExpr final : Expr {
-    explicit NameExpr(std::string name);
+struct PathInExpr final : Expr {
+    explicit PathInExpr(std::vector<PathExprSegment> segments);
     void print(std::ostream &out, std::size_t indent) const override;
 
-    std::string name;
-};
-
-struct PathExpr final : Expr {
-    explicit PathExpr(std::vector<PathSegment> segments);
-    void print(std::ostream &out, std::size_t indent) const override;
-
-    std::vector<PathSegment> segments;
+    std::vector<PathExprSegment> segments;
 };
 
 struct CallExpr final : Expr {
@@ -292,6 +285,7 @@ struct ArrayExpr final : Expr {
 
 struct Parameter {
     std::string name;
+    bool isMutable = false;
     TypePtr type;
 };
 
@@ -389,12 +383,11 @@ struct StructExprField {
 };
 
 struct StructExpr final : Expr {
-    StructExpr(PathExpr path,
-               std::vector<StructExprField> fields);
+    StructExpr(PathInExpr path, std::vector<StructExprField> fields);
 
     void print(std::ostream &out, std::size_t indent) const override;
 
-    PathExpr path;
+    PathInExpr path;
     std::vector<StructExprField> fields;
 };
 
