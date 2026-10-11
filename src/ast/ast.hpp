@@ -237,9 +237,8 @@ struct SelfParam {
 struct WhereClauseItem {
     void print(std::ostream &out, std::size_t indent) const;
 
-    // Exactly one of the two left-hand sides is populated.
-    std::optional<std::string> lifetime; // lifetime COLON lifetimeBounds
-    std::optional<std::string> type;     // typeRef COLON typeParamBounds?
+    std::optional<std::string> lifetime;
+    std::optional<std::string> type;
     std::vector<std::string> bounds;
 };
 
@@ -338,7 +337,7 @@ struct StructField {
     std::string type;
 };
 
-struct Function final : Item {
+struct FunctionItem final : Item {
     void print(std::ostream &out, std::size_t indent = 0) const override;
 
     std::string name;
@@ -379,7 +378,7 @@ struct ConstValue {
 
     Kind kind;
     std::string value;
-    std::unique_ptr<ConstValue> operand; // 仅 Negate 使用
+    std::unique_ptr<ConstValue> operand;
 };
 
 struct ConstantItem final : Item {

@@ -585,7 +585,7 @@ void Crate::print(std::ostream &out, std::size_t indent) const {
     }
 }
 
-void Function::print(std::ostream &out, std::size_t indent) const {
+void FunctionItem::print(std::ostream &out, std::size_t indent) const {
     detail::printIndent(out, indent);
     out << "Function " << name;
     if (returnType) {
