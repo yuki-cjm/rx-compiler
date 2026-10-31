@@ -20,16 +20,18 @@ struct EvaluatedConst {
 // 求值一个常量上下文中的常量表达式（ast::ConstValue）。
 // 支持：整数/布尔字面量、常量路径（递归求值）、取负、括号。
 // expectedType 为期望类型（常量项声明类型 / 数组长度的 usize）。
+// selfType 为当前 Self 上下文（impl / struct），无则传 nullptr。
 // 失败（类型不匹配、路径非常量、取负用于无符号等）返回 nullopt 并写入 diag。
 std::optional<EvaluatedConst> evaluateConst(SymbolTable &table,
                                             Diagnostic &diag,
                                             const ast::ConstValue &value,
-                                            const TyPtr &expectedType);
+                                            const TyPtr &expectedType,
+                                            const TyPtr &selfType);
 
 // 求数组长度：必须是 usize 常量。供 resolve 阶段调用。
-// 失败返回 nullopt 并写入 diag。
+// selfType 为当前 Self 上下文；失败返回 nullopt 并写入 diag。
 std::optional<std::uint64_t>
 evaluateArrayLength(SymbolTable &table, Diagnostic &diag,
-                    const ast::ConstValue &value);
+                    const ast::ConstValue &value, const TyPtr &selfType);
 
 } // namespace rx::semantic
