@@ -71,6 +71,25 @@ class TypeChecker : public ast::ASTVisitor {
     // 查询已记录的表达式类型。
     TyPtr typeOf(const ast::Expr &expr) const;
 
+    // ---- place 分类（赋值左值 / 借用 / 方法 receiver 的可变性检查）----
+    enum class PlaceAccess {
+        Mutable,  // 可写
+        Owned,    // 不可写但拥有其值（&mut 可继续解引用）
+        Shared,   // 共享借用（&mut 不可再解引用）
+    };
+    struct PlaceResult {
+        TyPtr type;
+        PlaceAccess access;
+    };
+    std::optional<PlaceResult> classifyPlace(ast::Expr &expr);
+    PlaceAccess baseAccess(ast::Expr &expr);
+
+    // 检查单个函数体（顶层或 impl 关联方法）。
+    void checkFunctionBody(ast::FunctionItem &function, const TyPtr &selfType);
+
+    // 解析常量符号的声明类型。
+    TyPtr resolveConstantType(const Symbol &symbol);
+
     SymbolTable &table_;
     Diagnostic &diag_;
 
@@ -79,6 +98,9 @@ class TypeChecker : public ast::ASTVisitor {
     TyPtr currentSelf_;                     // 当前方法 / impl 的 Self 类型（nullptr = 无）
     int loopDepth_ = 0;                     // 循环嵌套深度
     std::optional<TyPtr> currentLoopBreak_; // 当前 loop 的 break 目标类型
+    std::vector<std::vector<TyPtr>> loopBreakValues_; // 各层 loop 收集的 break 值类型
+    std::vector<bool> loopIsWhile_;         // 各层循环是否为 while
+    std::vector<int> conditionBarriers_;    // while 条件的 break 屏障深度
 
     // ---- 期望类型（临时上下文）----
     std::optional<TyPtr> expected_;
