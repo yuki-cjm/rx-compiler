@@ -3,6 +3,7 @@
 #include "antlr4-runtime.h"
 #include "ast/ast_builder.hpp"
 #include "ast/ast_printer.hpp"
+#include "semantic/semantic.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -25,23 +26,26 @@ class ErrorCounter final : public antlr4::BaseErrorListener {
 
 int main(int argc, char **argv) {
     bool printAst = false;
+    bool semantic = false;
     const char *sourcePath = nullptr;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--ast") {
             printAst = true;
+        } else if (argument == "--semantic") {
+            semantic = true;
         } else if (argument == "--help") {
-            std::cout << "usage: rx-parse [--ast] [source.rx]\n";
+            std::cout << "usage: rx-parse [--ast] [--semantic] [source.rx]\n";
             return 0;
         } else if (!argument.empty() && argument.front() == '-') {
             std::cerr << "unknown option: " << argument << '\n'
-                      << "usage: rx-parse [--ast] [source.rx]\n";
+                      << "usage: rx-parse [--ast] [--semantic] [source.rx]\n";
             return 2;
         } else if (sourcePath == nullptr) {
             sourcePath = argv[i];
         } else {
             std::cerr << "only one source file may be specified\n"
-                      << "usage: rx-parse [--ast] [source.rx]\n";
+                      << "usage: rx-parse [--ast] [--semantic] [source.rx]\n";
             return 2;
         }
     }
@@ -73,6 +77,22 @@ int main(int argc, char **argv) {
     auto *tree = parser.crate();
     if (errors.count != 0) {
         return 1;
+    }
+
+    if (semantic) {
+        try {
+            rx::ast::Program program = rx::ast::AstBuilder().build(tree);
+            rx::semantic::SemanticAnalyzer analyzer;
+            bool ok = analyzer.check(program);
+            for (const std::string &message :
+                 analyzer.diagnostics().messages()) {
+                std::cerr << "error: " << message << '\n';
+            }
+            return ok ? 0 : 1;
+        } catch (const std::runtime_error &error) {
+            std::cerr << "AST lowering error: " << error.what() << '\n';
+            return 1;
+        }
     }
 
     if (!printAst) {
