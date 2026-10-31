@@ -237,7 +237,8 @@ std::any LetStmt::accept(ASTVisitor &visitor) {
     return visitor.visitLetStmt(this);
 }
 
-ExprStmt::ExprStmt(ExprPtr expression) : expression(std::move(expression)) {}
+ExprStmt::ExprStmt(ExprPtr expression, bool hasSemicolon)
+    : expression(std::move(expression)), hasSemicolon(hasSemicolon) {}
 
 std::any ExprStmt::accept(ASTVisitor &visitor) {
     return visitor.visitExprStmt(this);

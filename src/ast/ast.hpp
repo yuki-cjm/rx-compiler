@@ -192,10 +192,11 @@ struct LetStmt : public Stmt {
 };
 
 struct ExprStmt : public Stmt {
-    ExprStmt(ExprPtr expression);
+    ExprStmt(ExprPtr expression, bool hasSemicolon = false);
     std::any accept(ASTVisitor &visitor) override;
 
     ExprPtr expression;
+    bool hasSemicolon = false;
 };
 
 struct IntegerLiteralExpr final : Expr {

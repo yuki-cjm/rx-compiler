@@ -489,11 +489,12 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     }
 
     if (auto *expressionWithBlock = context->expressionWithBlock()) {
-        return std::make_unique<ExprStmt>(buildExpr(expressionWithBlock));
+        return std::make_unique<ExprStmt>(buildExpr(expressionWithBlock),
+                                          context->SEMI() != nullptr);
     }
 
     if (auto *expression = context->statementExpression()) {
-        return std::make_unique<ExprStmt>(buildExpr(expression));
+        return std::make_unique<ExprStmt>(buildExpr(expression), true);
     }
 
     if (context->SEMI() != nullptr) {
@@ -513,6 +514,20 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
         ExprPtr tail;
         if (auto *tailContext = block->statementExpression()) {
             tail = buildExpr(tailContext);
+        }
+        // 最后一个「无分号的 ExpressionWithBlock」语句是块尾表达式。
+        if (tail == nullptr && !statements.empty()) {
+            auto *last = dynamic_cast<ExprStmt *>(statements.back().get());
+            if (last != nullptr && !last->hasSemicolon) {
+                auto &expression = last->expression;
+                if (dynamic_cast<BlockExpr *>(expression.get()) != nullptr ||
+                    dynamic_cast<IfExpr *>(expression.get()) != nullptr ||
+                    dynamic_cast<LoopExpr *>(expression.get()) != nullptr ||
+                    dynamic_cast<WhileExpr *>(expression.get()) != nullptr) {
+                    tail = std::move(expression);
+                    statements.pop_back();
+                }
+            }
         }
         return BlockExpr(std::move(statements), std::move(tail));
     };
