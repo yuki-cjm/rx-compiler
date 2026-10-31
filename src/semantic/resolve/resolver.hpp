@@ -22,6 +22,8 @@ class TypeResolver {
     TyPtr resolveSignature(const ast::Type &type);
 
   private:
+    TyPtr resolvePath(const ast::PathType &path, const TyPtr &selfType);
+
     SymbolTable &table_;
     Diagnostic &diag_;
 };
