@@ -49,11 +49,14 @@ class SymbolTable {
     // 通过 structId 取得结构体符号（供 resolve / trait 能力查询使用）。
     const Symbol *lookupStruct(StructId structId) const;
 
+    // 通过 structId 取得可写的结构体符号（供 resolve 阶段填充字段类型）。
+    Symbol *lookupStructMutable(StructId structId);
+
   private:
     SymbolMap types_;
     SymbolMap values_;
     std::map<StructId, SymbolMap> assoc_;
-    std::map<StructId, const Symbol *> structs_; // structId → 结构体符号（含字段）
+    std::map<StructId, Symbol *> structs_; // structId → 结构体符号（含字段）
     Scope scope_;
     StructId nextStructId_ = 0;
 };

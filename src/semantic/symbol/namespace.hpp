@@ -18,6 +18,9 @@ class SymbolMap {
     // 查找符号；未找到返回 nullptr。
     const Symbol *find(const std::string &name) const;
 
+    // 查找可写的符号（供 resolve 阶段填充已解析类型）。
+    Symbol *findMutable(const std::string &name);
+
     // 是否存在该名字。
     bool contains(const std::string &name) const;
 
