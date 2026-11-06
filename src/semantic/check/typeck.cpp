@@ -253,6 +253,43 @@ TypeChecker::PlaceAccess TypeChecker::baseAccess(ast::Expr &expr) {
     return place ? place->access : PlaceAccess::Mutable;
 }
 
+bool TypeChecker::stmtDiverges(ast::Stmt &stmt) {
+    if (auto *exprStmt = dynamic_cast<ast::ExprStmt *>(&stmt)) {
+        return exprDiverges(*exprStmt->expression);
+    }
+    return false;
+}
+
+bool TypeChecker::exprDiverges(ast::Expr &expr) {
+    if (dynamic_cast<ast::ReturnExpr *>(&expr) != nullptr ||
+        dynamic_cast<ast::BreakExpr *>(&expr) != nullptr ||
+        dynamic_cast<ast::ContinueExpr *>(&expr) != nullptr) {
+        return true;
+    }
+    if (auto *block = dynamic_cast<ast::BlockExpr *>(&expr)) {
+        for (auto &statement : block->statements) {
+            if (stmtDiverges(*statement)) {
+                return true;
+            }
+        }
+        if (block->tail != nullptr) {
+            return exprDiverges(*block->tail);
+        }
+        return false;
+    }
+    if (auto *loop = dynamic_cast<ast::LoopExpr *>(&expr)) {
+        return isNever(typeOf(expr));
+    }
+    if (auto *ifExpr = dynamic_cast<ast::IfExpr *>(&expr)) {
+        if (ifExpr->elseBranch == nullptr) {
+            return false;
+        }
+        return exprDiverges(ifExpr->thenBranch) &&
+               exprDiverges(*ifExpr->elseBranch);
+    }
+    return false;
+}
+
 // ---- Items ----
 
 std::any TypeChecker::visitCrate(ast::Crate *node) {
@@ -595,21 +632,19 @@ std::any TypeChecker::visitArrayExpr(ast::ArrayExpr *node) {
 std::any TypeChecker::visitBlockExpr(ast::BlockExpr *node) {
     table_.scope().push();
 
-    bool allDiverge = true;
+    bool blockDiverges = false;
     for (ast::StmtPtr &statement : node->statements) {
-        TyPtr statementType = std::any_cast<TyPtr>(statement->accept(*this));
-        if (!isNever(statementType)) {
-            allDiverge = false;
+        statement->accept(*this);
+        if (stmtDiverges(*statement)) {
+            blockDiverges = true;
         }
     }
 
     TyPtr result;
     if (node->tail != nullptr) {
         result = checkExpr(*node->tail, expected_);
-    } else if (node->statements.empty()) {
-        result = Ty::makeUnit();
     } else {
-        result = allDiverge ? Ty::makeNever() : Ty::makeUnit();
+        result = blockDiverges ? Ty::makeNever() : Ty::makeUnit();
     }
 
     table_.scope().pop();

@@ -90,6 +90,10 @@ class TypeChecker : public ast::ASTVisitor {
     // 解析常量符号的声明类型。
     TyPtr resolveConstantType(const Symbol &symbol);
 
+    // 表达式是否发散（不完整正常执行）。
+    bool exprDiverges(ast::Expr &expr);
+    bool stmtDiverges(ast::Stmt &stmt);
+
     SymbolTable &table_;
     Diagnostic &diag_;
 
