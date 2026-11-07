@@ -7,8 +7,12 @@ void Diagnostic::error(const std::string &message) {
 }
 
 void Diagnostic::error(const Span &span, const std::string &message) {
-    (void)span;
-    messages_.push_back(message);
+    if (span.line != 0) {
+        messages_.push_back("line " + std::to_string(span.line) + ":" +
+                            std::to_string(span.column) + ": " + message);
+    } else {
+        messages_.push_back(message);
+    }
 }
 
 bool Diagnostic::hasErrors() const { return !messages_.empty(); }

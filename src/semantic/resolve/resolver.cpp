@@ -7,21 +7,21 @@ namespace rx::semantic {
 TypeResolver::TypeResolver(SymbolTable &table, Diagnostic &diag)
     : table_(table), diag_(diag) {}
 
-TyPtr TypeResolver::resolve(const ast::Type &type, const TyPtr &selfType) {
+TypePtr TypeResolver::resolve(const ast::Type &type, const TypePtr &selfType) {
     if (auto *unit = dynamic_cast<const ast::UnitType *>(&type)) {
-        return Ty::makeUnit();
+        return Type::makeUnit();
     }
     if (auto *reference = dynamic_cast<const ast::ReferenceType *>(&type)) {
-        TyPtr inner = resolve(*reference->inner, selfType);
+        TypePtr inner = resolve(*reference->inner, selfType);
         if (inner == nullptr) {
             return nullptr;
         }
         Mutability mutability =
             reference->isMutable ? Mutability::Mutable : Mutability::Shared;
-        return Ty::makeReference(std::move(inner), mutability);
+        return Type::makeReference(std::move(inner), mutability);
     }
     if (auto *array = dynamic_cast<const ast::ArrayType *>(&type)) {
-        TyPtr element = resolve(*array->element, selfType);
+        TypePtr element = resolve(*array->element, selfType);
         if (element == nullptr) {
             return nullptr;
         }
@@ -30,12 +30,12 @@ TyPtr TypeResolver::resolve(const ast::Type &type, const TyPtr &selfType) {
         if (!length) {
             return nullptr;
         }
-        return Ty::makeArray(std::move(element), *length);
+        return Type::makeArray(std::move(element), *length);
     }
     if (auto *path = dynamic_cast<const ast::PathType *>(&type)) {
         return resolvePath(*path, selfType);
     }
-    diag_.error("unsupported type");
+    diag_.error(type.span(), "unsupported type");
     return nullptr;
 }
 
@@ -66,30 +66,30 @@ const ast::Type *findTypeArgument(
     return nullptr;
 }
 
-TyPtr TypeResolver::resolvePath(const ast::PathType &path,
-                                const TyPtr &selfType) {
-    if (path.segments.empty() || path.segments.size() != 1) {
-        diag_.error("multi-segment type paths are unsupported");
+TypePtr TypeResolver::resolvePath(const ast::PathType &path,
+                                const TypePtr &selfType) {
+    if (path.segments.size() != 1) {
+        diag_.error(path.span(), "multi-segment type paths are unsupported");
         return nullptr;
     }
 
     const ast::TypePathSegment &segment = path.segments[0];
     if (segment.ident.kind == ast::PathSegmentKind::SelfType) {
         if (selfType == nullptr) {
-            diag_.error("'Self' used outside a struct context");
+            diag_.error(path.span(), "'Self' used outside a struct context");
             return nullptr;
         }
         return selfType;
     }
     if (segment.ident.kind != ast::PathSegmentKind::Ident) {
-        diag_.error("unresolved type name");
+        diag_.error(path.span(), "unresolved type name");
         return nullptr;
     }
 
     const std::string &name = segment.ident.name;
     const Symbol *symbol = table_.lookupType(name);
     if (symbol == nullptr) {
-        diag_.error("unresolved type name '" + name + "'");
+        diag_.error(path.span(), "unresolved type name '" + name + "'");
         return nullptr;
     }
 
@@ -97,10 +97,10 @@ TyPtr TypeResolver::resolvePath(const ast::PathType &path,
 
     if (symbol->kind == SymbolKind::Struct) {
         if (typeArgCount != 0) {
-            diag_.error("structs have no type parameters");
+            diag_.error(path.span(), "structs have no type parameters");
             return nullptr;
         }
-        return Ty::makeStruct(symbol->structId);
+        return Type::makeStruct(symbol->structId);
     }
 
     if (symbol->kind == SymbolKind::BuiltinType) {
@@ -110,27 +110,23 @@ TyPtr TypeResolver::resolvePath(const ast::PathType &path,
                                    "argument");
                 return nullptr;
             }
-            TyPtr element = resolve(*findTypeArgument(segment.genericArgs),
+            TypePtr element = resolve(*findTypeArgument(segment.genericArgs),
                                     selfType);
             if (element == nullptr) {
                 return nullptr;
             }
-            return name == "Box" ? Ty::makeBox(std::move(element))
-                                 : Ty::makeVec(std::move(element));
+            return name == "Box" ? Type::makeBox(std::move(element))
+                                 : Type::makeVec(std::move(element));
         }
         if (typeArgCount != 0) {
-            diag_.error("primitives take no type arguments");
+            diag_.error(path.span(), "primitives take no type arguments");
             return nullptr;
         }
         return symbol->type;
     }
 
-    diag_.error("unresolved type name '" + name + "'");
+    diag_.error(path.span(), "unresolved type name '" + name + "'");
     return nullptr;
-}
-
-TyPtr TypeResolver::resolveSignature(const ast::Type &type) {
-    return resolve(type, nullptr);
 }
 
 } // namespace rx::semantic

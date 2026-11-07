@@ -1,7 +1,7 @@
 #include "layout_check.hpp"
 
 #include "../symbol/symbol.hpp"
-#include "../ty/ty.hpp"
+#include "../type/type.hpp"
 
 #include <functional>
 #include <set>
@@ -13,17 +13,17 @@ LayoutChecker::LayoutChecker(SymbolTable &table, Diagnostic &diag)
 
 namespace {
 
-// 收集按值（inline）可达的结构体：沿 Struct / Array 递归，
-// Reference / Box / Vec 提供间接，终止递归。
-void collectInlineStructs(const TyPtr &type, std::set<StructId> &out) {
+// 沿 Struct / Array 递归
+// Reference / Box / Vec 提供间接，终止递归
+void collectInlineStructs(const TypePtr &type, std::set<StructId> &out) {
     if (type == nullptr) {
         return;
     }
-    if (type->kind == TyKind::Struct) {
+    if (type->kind == TypeKind::Struct) {
         out.insert(type->structId);
         return;
     }
-    if (type->kind == TyKind::Array) {
+    if (type->kind == TypeKind::Array) {
         collectInlineStructs(type->inner, out);
         return;
     }
@@ -43,7 +43,7 @@ void LayoutChecker::check(const ast::Program &program) {
         const Symbol *symbol = table_.lookupType(structure->name);
         if (symbol == nullptr) {
             continue;
-        }
+        } // 一般不发生
         order.push_back(symbol->structId);
         std::set<StructId> targets;
         for (const FieldInfo &field : symbol->fields) {

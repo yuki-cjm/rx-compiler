@@ -1,7 +1,7 @@
 #include "main_check.hpp"
 
 #include "../resolve/resolver.hpp"
-#include "../ty/ty.hpp"
+#include "../type/type.hpp"
 
 namespace rx::semantic {
 
@@ -17,18 +17,18 @@ void MainChecker::check() {
 
     const ast::FunctionItem &function = *main->function;
     if (function.genericParams.has_value()) {
-        diag_.error("main cannot have generic parameters");
+        diag_.error(function.span(), "main cannot have generic parameters");
     }
     if (!function.parameters.empty()) {
-        diag_.error("main cannot have value parameters");
+        diag_.error(function.span(), "main cannot have value parameters");
     }
 
     TypeResolver resolver(table_, diag_);
-    TyPtr returnType = function.returnType != nullptr
+    TypePtr returnType = function.returnType != nullptr
                            ? resolver.resolve(*function.returnType, nullptr)
-                           : Ty::makeUnit();
+                           : Type::makeUnit();
     if (returnType != nullptr && !isUnit(returnType)) {
-        diag_.error("main must return unit");
+        diag_.error(function.span(), "main must return unit");
     }
 }
 

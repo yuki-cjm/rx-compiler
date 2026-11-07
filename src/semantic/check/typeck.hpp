@@ -3,7 +3,7 @@
 #include "../../ast/ast_visitor.hpp"
 #include "../symbol/symbol_table.hpp"
 #include "../diag/diagnostic.hpp"
-#include "../ty/ty.hpp"
+#include "../type/type.hpp"
 
 #include <any>
 #include <optional>
@@ -12,15 +12,12 @@
 namespace rx::semantic {
 
 // Pass 2：类型检查主 visitor。
-// 实现 ast::ASTVisitor，递归遍历 AST，为每个表达式计算类型（TyPtr），
-// 同时做名字解析、类型推断、运算符检查、强制转换、控制流检查等。
 // 具体规则分散在 check/ 下的子模块（infer / coercion / operators / calls /
 // place / assign / control_flow），本类只负责调度与上下文维护。
 class TypeChecker : public ast::ASTVisitor {
   public:
     TypeChecker(SymbolTable &table, Diagnostic &diag);
 
-    // 对整个程序做类型检查。返回 true 表示无新增错误。
     bool check(const ast::Program &program);
 
     // ---- ast::ASTVisitor 实现 ----
@@ -62,33 +59,32 @@ class TypeChecker : public ast::ASTVisitor {
 
   private:
     // 在给定期望类型下检查一个表达式，返回其类型。
-    // 会临时设置 expected_ 再调用 expr.accept(*this)。
-    TyPtr checkExpr(ast::Expr &expr, const std::optional<TyPtr> &expected);
+    TypePtr checkExpr(ast::Expr &expr, const std::optional<TypePtr> &expected);
 
-    // 记录表达式类型到 side table（供 place / calls 等后续查询）。
-    void recordType(const ast::Expr &expr, const TyPtr &ty);
+    // 记录表达式类型到 side table
+    void recordType(const ast::Expr &expr, const TypePtr &type);
 
-    // 查询已记录的表达式类型。
-    TyPtr typeOf(const ast::Expr &expr) const;
+    // 查询已记录的表达式类型
+    TypePtr typeOf(const ast::Expr &expr) const;
 
-    // ---- place 分类（赋值左值 / 借用 / 方法 receiver 的可变性检查）----
     enum class PlaceAccess {
-        Mutable,  // 可写
-        Owned,    // 不可写但拥有其值（&mut 可继续解引用）
-        Shared,   // 共享借用（&mut 不可再解引用）
+        Mutable,
+        Owned,
+        Shared,
     };
+
     struct PlaceResult {
-        TyPtr type;
+        TypePtr type;
         PlaceAccess access;
     };
     std::optional<PlaceResult> classifyPlace(ast::Expr &expr);
     PlaceAccess baseAccess(ast::Expr &expr);
 
     // 检查单个函数体（顶层或 impl 关联方法）。
-    void checkFunctionBody(ast::FunctionItem &function, const TyPtr &selfType);
+    void checkFunctionBody(ast::FunctionItem &function, const TypePtr &selfType);
 
     // 解析常量符号的声明类型。
-    TyPtr resolveConstantType(const Symbol &symbol);
+    TypePtr resolveConstantType(const Symbol &symbol);
 
     // 表达式是否发散（不完整正常执行）。
     bool exprDiverges(ast::Expr &expr);
@@ -98,19 +94,17 @@ class TypeChecker : public ast::ASTVisitor {
     Diagnostic &diag_;
 
     // ---- 检查上下文 ----
-    std::optional<TyPtr> currentReturn_;    // 当前函数返回类型（无标注 = Unit）
-    TyPtr currentSelf_;                     // 当前方法 / impl 的 Self 类型（nullptr = 无）
-    int loopDepth_ = 0;                     // 循环嵌套深度
-    std::optional<TyPtr> currentLoopBreak_; // 当前 loop 的 break 目标类型
-    std::vector<std::vector<TyPtr>> loopBreakValues_; // 各层 loop 收集的 break 值类型
-    std::vector<bool> loopIsWhile_;         // 各层循环是否为 while
-    std::vector<int> conditionBarriers_;    // while 条件的 break 屏障深度
+    std::optional<TypePtr> currentReturn_;
+    TypePtr currentSelf_;
+    int loopDepth_ = 0;
+    std::optional<TypePtr> currentLoopBreak_;
+    std::vector<std::vector<TypePtr>> loopBreakValues_;
+    std::vector<bool> loopIsWhile_;
+    std::vector<int> conditionBarriers_;
 
-    // ---- 期望类型（临时上下文）----
-    std::optional<TyPtr> expected_;
+    std::optional<TypePtr> expected_;
 
-    // 表达式 → 类型 side table（不改 AST，供后续 IR 复用）。
-    std::unordered_map<const ast::Expr *, TyPtr> exprTypes_;
+    std::unordered_map<const ast::Expr *, TypePtr> exprTypes_;
 };
 
 } // namespace rx::semantic

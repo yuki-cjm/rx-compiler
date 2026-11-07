@@ -1,7 +1,7 @@
 #include "const_eval.hpp"
 
 #include "../resolve/resolver.hpp"
-#include "../ty/ty_compare.hpp"
+#include "../type/type_compare.hpp"
 
 #include <cstdint>
 #include <set>
@@ -10,9 +10,8 @@ namespace rx::semantic {
 
 namespace {
 
-// 解析后的整数字面量：类型 + 32 位无符号位型（负值以补码表示）。
 struct ParsedInt {
-    TyPtr type;
+    TypePtr type;
     std::uint64_t value;
 };
 
@@ -29,7 +28,7 @@ int digitValue(char character) {
     return -1;
 }
 
-// 判断文本是否以给定后缀结尾（用于整数字面量后缀检测）。
+// 后缀
 bool endsWith(const std::string &text, const std::string &suffix) {
     return text.size() >= suffix.size() &&
            text.compare(text.size() - suffix.size(), suffix.size(), suffix) ==
@@ -37,26 +36,26 @@ bool endsWith(const std::string &text, const std::string &suffix) {
 }
 
 std::optional<ParsedInt> parseInteger(const std::string &text,
-                                      const std::optional<TyPtr> &expected) {
+                                      const std::optional<TypePtr> &expected) {
     std::string body = text;
-    TyPtr type;
+    TypePtr type;
 
     if (endsWith(body, "usize")) {
-        type = Ty::makeScalar(TyKind::Usize);
+        type = Type::makeScalar(TypeKind::Usize);
         body.resize(body.size() - 5);
     } else if (endsWith(body, "isize")) {
-        type = Ty::makeScalar(TyKind::Isize);
+        type = Type::makeScalar(TypeKind::Isize);
         body.resize(body.size() - 5);
     } else if (endsWith(body, "u32")) {
-        type = Ty::makeScalar(TyKind::U32);
+        type = Type::makeScalar(TypeKind::U32);
         body.resize(body.size() - 3);
     } else if (endsWith(body, "i32")) {
-        type = Ty::makeScalar(TyKind::I32);
+        type = Type::makeScalar(TypeKind::I32);
         body.resize(body.size() - 3);
     } else if (expected && isInteger(expected.value())) {
         type = expected.value();
     } else {
-        type = Ty::makeScalar(TyKind::I32);
+        type = Type::makeScalar(TypeKind::I32);
     }
 
     int base = 10;
@@ -99,7 +98,6 @@ std::optional<ParsedInt> parseInteger(const std::string &text,
     return result;
 }
 
-// 把常量路径文本按 "::" 拆成段。
 std::vector<std::string> splitPath(const std::string &text) {
     std::vector<std::string> segments;
     std::size_t start = 0;
@@ -115,14 +113,12 @@ std::vector<std::string> splitPath(const std::string &text) {
     return segments;
 }
 
-// 求值器状态（memo + 环检测），线程局部以便各入口共享。
-thread_local std::map<const Symbol *, std::optional<EvaluatedConst>> memo_;
-thread_local std::set<const Symbol *> visiting_;
+std::map<const Symbol *, std::optional<EvaluatedConst>> memo_; // 缓存
+std::set<const Symbol *> visiting_;                            // 环检测器
 
-// 解析常量路径，返回常量符号；失败返回 nullptr 并写 diag。
 const Symbol *resolveConstPath(SymbolTable &table, Diagnostic &diag,
                                const std::string &text,
-                               const TyPtr &selfType) {
+                               const TypePtr &selfType) {
     std::vector<std::string> segments = splitPath(text);
     if (segments.size() == 1) {
         const Symbol *symbol = table.resolveValue(segments[0]);
@@ -146,7 +142,11 @@ const Symbol *resolveConstPath(SymbolTable &table, Diagnostic &diag,
             structId = selfType->structId;
         } else {
             const Symbol *typeSymbol = table.lookupType(segments[0]);
-            if (typeSymbol == nullptr || typeSymbol->kind != SymbolKind::Struct) {
+            if (typeSymbol == nullptr) {
+                diag.error("unresolved type name '" + segments[0] + "'");
+                return nullptr;
+            }
+            if (typeSymbol->kind != SymbolKind::Struct) {
                 diag.error("'" + segments[0] + "' is not a struct");
                 return nullptr;
             }
@@ -163,26 +163,25 @@ const Symbol *resolveConstPath(SymbolTable &table, Diagnostic &diag,
     return nullptr;
 }
 
-// 求值一个常量符号的初值（memo 化 + 环检测）。
-std::optional<EvaluatedConst> evaluateSymbol(SymbolTable &table,
-                                             Diagnostic &diag,
-                                             const Symbol *symbol) {
+std::optional<EvaluatedConst>
+evaluateSymbol(SymbolTable &table, Diagnostic &diag, const Symbol *symbol) {
     auto found = memo_.find(symbol);
     if (found != memo_.end()) {
         return found->second;
     }
     if (visiting_.count(symbol) != 0) {
-        diag.error("constant dependency cycle involving '" + symbol->name + "'");
+        diag.error("constant dependency cycle involving '" + symbol->name +
+                   "'");
         return std::nullopt;
     }
 
     visiting_.insert(symbol);
 
     TypeResolver resolver(table, diag);
-    TyPtr selfType = symbol->implTarget != 0
-                         ? Ty::makeStruct(symbol->implTarget)
-                         : nullptr;
-    TyPtr declared = resolver.resolve(*symbol->constant->type, selfType);
+    TypePtr selfType = symbol->implTarget != 0
+                           ? Type::makeStruct(symbol->implTarget)
+                           : nullptr;
+    TypePtr declared = resolver.resolve(*symbol->constant->type, selfType);
 
     std::optional<EvaluatedConst> result;
     if (declared != nullptr) {
@@ -195,11 +194,11 @@ std::optional<EvaluatedConst> evaluateSymbol(SymbolTable &table,
     return result;
 }
 
-std::optional<EvaluatedConst> matchExpected(Diagnostic &diag,
+std::optional<EvaluatedConst> matchExpected(Diagnostic &diag, const Span &span,
                                             EvaluatedConst result,
-                                            const TyPtr &expectedType) {
-    if (expectedType != nullptr && !sameTy(result.type, expectedType)) {
-        diag.error("constant initializer does not match its declared type");
+                                            const TypePtr &expectedType) {
+    if (expectedType != nullptr && !sameType(result.type, expectedType)) {
+        diag.error(span, "constant initializer does not match its declared type");
         return std::nullopt;
     }
     return result;
@@ -210,27 +209,28 @@ std::optional<EvaluatedConst> matchExpected(Diagnostic &diag,
 std::optional<EvaluatedConst> evaluateConst(SymbolTable &table,
                                             Diagnostic &diag,
                                             const ast::ConstValue &value,
-                                            const TyPtr &expectedType,
-                                            const TyPtr &selfType) {
+                                            const TypePtr &expectedType,
+                                            const TypePtr &selfType) {
     switch (value.kind) {
     case ast::ConstValue::Kind::Integer: {
         auto parsed = parseInteger(value.value, expectedType);
         if (!parsed) {
-            diag.error("invalid integer literal '" + value.value + "'");
+            diag.error(value.span, "invalid integer literal '" + value.value + "'");
             return std::nullopt;
         }
         EvaluatedConst result;
         result.type = parsed->type;
         result.intValue = parsed->value;
-        return matchExpected(diag, std::move(result), expectedType);
+        return matchExpected(diag, value.span, std::move(result), expectedType);
     }
     case ast::ConstValue::Kind::Boolean: {
         if (expectedType != nullptr && !isBool(expectedType)) {
-            diag.error("constant initializer does not match its declared type");
+            diag.error(value.span,
+                       "constant initializer does not match its declared type");
             return std::nullopt;
         }
         EvaluatedConst result;
-        result.type = Ty::makeScalar(TyKind::Bool);
+        result.type = Type::makeScalar(TypeKind::Bool);
         result.boolValue = value.boolValue;
         return result;
     }
@@ -244,21 +244,21 @@ std::optional<EvaluatedConst> evaluateConst(SymbolTable &table,
         if (!result) {
             return std::nullopt;
         }
-        return matchExpected(diag, std::move(*result), expectedType);
+        return matchExpected(diag, value.span, std::move(*result), expectedType);
     }
     case ast::ConstValue::Kind::Negate: {
         const ast::Magnitude &magnitude = value.operand;
 
         std::optional<EvaluatedConst> operand;
         if (magnitude.kind == ast::Magnitude::Kind::Integer) {
-            // 期望类型不穿透一元负号：字面量按后缀或默认 i32。
             auto parsed = parseInteger(magnitude.value, std::nullopt);
             if (!parsed) {
-                diag.error("invalid integer literal '" + magnitude.value + "'");
+                diag.error(value.span,
+                           "invalid integer literal '" + magnitude.value + "'");
                 return std::nullopt;
             }
             if (!isSignedInteger(parsed->type)) {
-                diag.error("unsigned constant negation is invalid");
+                diag.error(value.span, "unsigned constant negation is invalid");
                 return std::nullopt;
             }
             EvaluatedConst parsedValue;
@@ -278,17 +278,16 @@ std::optional<EvaluatedConst> evaluateConst(SymbolTable &table,
             return std::nullopt;
         }
         if (!isSignedInteger(operand->type)) {
-            diag.error("unsigned constant negation is invalid");
+            diag.error(value.span, "unsigned constant negation is invalid");
             return std::nullopt;
         }
 
-        std::uint32_t negated =
-            static_cast<std::uint32_t>(0 - static_cast<std::uint32_t>(
-                                              operand->intValue));
+        std::uint32_t negated = static_cast<std::uint32_t>(
+            0 - static_cast<std::uint32_t>(operand->intValue));
         EvaluatedConst result;
         result.type = operand->type;
         result.intValue = negated;
-        return matchExpected(diag, std::move(result), expectedType);
+        return matchExpected(diag, value.span, std::move(result), expectedType);
     }
     }
     return std::nullopt;
@@ -297,9 +296,9 @@ std::optional<EvaluatedConst> evaluateConst(SymbolTable &table,
 std::optional<std::uint64_t> evaluateArrayLength(SymbolTable &table,
                                                  Diagnostic &diag,
                                                  const ast::ConstValue &value,
-                                                 const TyPtr &selfType) {
-    auto result = evaluateConst(table, diag, value, Ty::makeScalar(TyKind::Usize),
-                                selfType);
+                                                 const TypePtr &selfType) {
+    auto result = evaluateConst(table, diag, value,
+                                Type::makeScalar(TypeKind::Usize), selfType);
     if (!result) {
         return std::nullopt;
     }

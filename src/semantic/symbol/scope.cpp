@@ -2,7 +2,7 @@
 
 namespace rx::semantic {
 
-void Scope::push() { layers_.emplace_back(); }
+void Scope::push() { layers_.push_back({}); }
 
 void Scope::pop() {
     if (!layers_.empty()) {
@@ -12,15 +12,13 @@ void Scope::pop() {
 
 void Scope::declare(const std::string &name, const Symbol &symbol) {
     if (layers_.empty()) {
-        layers_.emplace_back();
+        layers_.push_back({});
     }
-    // 覆盖同层同名绑定，实现 let shadowing。
     layers_.back()[name] = symbol;
 }
 
 const Symbol *Scope::lookup(const std::string &name) const {
-    for (auto iterator = layers_.rbegin(); iterator != layers_.rend();
-         ++iterator) {
+    for (auto iterator = layers_.rbegin(); iterator != layers_.rend(); ++iterator) {
         auto found = iterator->find(name);
         if (found != iterator->end()) {
             return &found->second;

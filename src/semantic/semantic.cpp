@@ -8,23 +8,11 @@
 #include "consteval/const_eval.hpp"
 #include "resolve/layout_check.hpp"
 #include "resolve/resolver.hpp"
-#include "ty/ty.hpp"
+#include "type/type.hpp"
 
 namespace rx::semantic {
 
 namespace {
-
-bool hasDerive(const Symbol *symbol, ast::DeriveTrait trait) {
-    if (symbol == nullptr) {
-        return false;
-    }
-    for (ast::DeriveTrait candidate : symbol->derives) {
-        if (candidate == trait) {
-            return true;
-        }
-    }
-    return false;
-}
 
 // 解析结构体字段类型，写回符号表。
 void resolveStructFields(const ast::Program &program, SymbolTable &table,
@@ -43,7 +31,7 @@ void resolveStructFields(const ast::Program &program, SymbolTable &table,
         if (mutableSymbol == nullptr) {
             continue;
         }
-        TyPtr selfType = Ty::makeStruct(symbol->structId);
+        TypePtr selfType = Type::makeStruct(symbol->structId);
         for (std::size_t index = 0; index < structure->fields.size(); ++index) {
             mutableSymbol->fields[index].type =
                 resolver.resolve(*structure->fields[index].type, selfType);
@@ -69,23 +57,23 @@ void checkDerives(const ast::Program &program, SymbolTable &table,
         bool deriveEq = hasDerive(symbol, ast::DeriveTrait::Eq);
 
         if (deriveCopy && !deriveClone) {
-            diag.error("deriving Copy requires Clone");
+            diag.error(structure->span(), "deriving Copy requires Clone");
         }
         if (deriveEq && !derivePartialEq) {
-            diag.error("deriving Eq requires PartialEq");
+            diag.error(structure->span(), "deriving Eq requires PartialEq");
         }
         for (const FieldInfo &field : symbol->fields) {
             if (deriveCopy && !isCopy(table, field.type)) {
-                diag.error("Copy requires every field to be Copy");
+                diag.error(structure->span(), "Copy requires every field to be Copy");
             }
             if (deriveClone && !isClone(table, field.type)) {
-                diag.error("Clone requires every field to be Clone");
+                diag.error(structure->span(), "Clone requires every field to be Clone");
             }
             if (derivePartialEq && !supportsPartialEq(table, field.type)) {
-                diag.error("PartialEq requires every field to be PartialEq");
+                diag.error(structure->span(), "PartialEq requires every field to be PartialEq");
             }
             if (deriveEq && !supportsEq(table, field.type)) {
-                diag.error("Eq requires every field to be Eq");
+                diag.error(structure->span(), "Eq requires every field to be Eq");
             }
         }
     }
@@ -101,13 +89,13 @@ void checkConstants(const ast::Program &program, SymbolTable &table,
             if (symbol == nullptr) {
                 continue;
             }
-            TyPtr type = resolver.resolve(*constant->type, nullptr);
+            TypePtr type = resolver.resolve(*constant->type, nullptr);
             if (type != nullptr) {
                 evaluateConst(table, diag, constant->value, type, nullptr);
             }
         } else if (auto *implementation =
                        dynamic_cast<const ast::ImplItem *>(item.get())) {
-            TyPtr target = resolver.resolve(*implementation->typeName, nullptr);
+            TypePtr target = resolver.resolve(*implementation->typeName, nullptr);
             if (target == nullptr || !isStruct(target)) {
                 continue;
             }
@@ -122,7 +110,7 @@ void checkConstants(const ast::Program &program, SymbolTable &table,
                 if (symbol == nullptr) {
                     continue;
                 }
-                TyPtr type = resolver.resolve(*constant->type, target);
+                TypePtr type = resolver.resolve(*constant->type, target);
                 if (type != nullptr) {
                     evaluateConst(table, diag, constant->value, type, target);
                 }

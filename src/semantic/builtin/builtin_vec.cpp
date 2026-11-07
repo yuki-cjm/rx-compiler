@@ -1,19 +1,16 @@
 #include "builtin_vec.hpp"
 
-#include "../ty/ty.hpp"
+#include "../type/type.hpp"
 
 #include <utility>
 
 namespace rx::semantic {
 
-TyPtr VecBuiltin::makeType(TyPtr element) {
-    return Ty::makeVec(std::move(element));
+TypePtr VecBuiltin::makeType(TypePtr element) {
+    return Type::makeVec(std::move(element));
 }
 
-bool VecBuiltin::isVecType(const TyPtr &ty) { return isVec(ty); }
-
-std::optional<BuiltinFnSig> VecBuiltin::lookup(const std::string &name,
-                                               const TyPtr &element) {
+std::optional<BuiltinFnSig> VecBuiltin::lookup(const std::string &name, const TypePtr &element) {
     BuiltinFnSig signature;
     signature.name = name;
     if (name == "new") {
@@ -23,23 +20,23 @@ std::optional<BuiltinFnSig> VecBuiltin::lookup(const std::string &name,
     }
     if (name == "len") {
         signature.receiver = ReceiverKind::Shared;
-        signature.result = Ty::makeScalar(TyKind::Usize);
+        signature.result = Type::makeScalar(TypeKind::Usize);
         return signature;
     }
     if (name == "is_empty") {
         signature.receiver = ReceiverKind::Shared;
-        signature.result = Ty::makeScalar(TyKind::Bool);
+        signature.result = Type::makeScalar(TypeKind::Bool);
         return signature;
     }
     if (name == "push") {
         signature.receiver = ReceiverKind::Mutable;
         signature.params.push_back(element);
-        signature.result = Ty::makeUnit();
+        signature.result = Type::makeUnit();
         return signature;
     }
     if (name == "remove") {
         signature.receiver = ReceiverKind::Mutable;
-        signature.params.push_back(Ty::makeScalar(TyKind::Usize));
+        signature.params.push_back(Type::makeScalar(TypeKind::Usize));
         signature.result = element;
         return signature;
     }
@@ -49,13 +46,6 @@ std::optional<BuiltinFnSig> VecBuiltin::lookup(const std::string &name,
         return signature;
     }
     return std::nullopt;
-}
-
-std::optional<TyPtr> VecBuiltin::indexElement(const TyPtr &ty) {
-    if (!isVec(ty)) {
-        return std::nullopt;
-    }
-    return ty->inner;
 }
 
 } // namespace rx::semantic

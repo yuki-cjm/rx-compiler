@@ -25,7 +25,33 @@ ruleChildren(antlr4::ParserRuleContext *context) {
     return result;
 }
 
-TypePtr buildType(Parser::TypeRefContext *context);
+TypePtr buildTypeImpl(Parser::TypeRefContext *context);
+TypePtr buildClosedCastTypeImpl(Parser::ClosedCastTypeContext *context);
+
+Span spanOf(antlr4::ParserRuleContext *context) {
+    Span span;
+    if (context != nullptr && context->getStart() != nullptr) {
+        span.line = context->getStart()->getLine();
+        span.column = context->getStart()->getCharPositionInLine() + 1;
+    }
+    return span;
+}
+
+TypePtr buildType(Parser::TypeRefContext *context) {
+    TypePtr result = buildTypeImpl(context);
+    if (result != nullptr) {
+        result->setSpan(spanOf(context));
+    }
+    return result;
+}
+
+TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
+    TypePtr result = buildClosedCastTypeImpl(context);
+    if (result != nullptr) {
+        result->setSpan(spanOf(context));
+    }
+    return result;
+}
 
 GenericParams buildGenericParams(Parser::GenericParamsContext *context) {
     GenericParams genericParams;
@@ -94,6 +120,7 @@ Magnitude buildMagnitude(Parser::MagnitudeContext *context) {
     } else {
         unsupported(context);
     }
+    value.span = spanOf(context);
     return value;
 }
 
@@ -121,6 +148,7 @@ ConstValue buildConstValue(Parser::ConstValueContext *context) {
     } else {
         unsupported(context);
     }
+    value.span = spanOf(context);
     return value;
 }
 
@@ -268,7 +296,7 @@ TypePtr buildReferenceType(bool isDouble,
     return innerReference;
 }
 
-TypePtr buildType(Parser::TypeRefContext *context) {
+TypePtr buildTypeImpl(Parser::TypeRefContext *context) {
     if (auto *typePath = context->typePath()) {
         auto path = std::make_unique<PathType>();
         path->segments.reserve(typePath->typePathSegment().size());
@@ -312,7 +340,7 @@ TypePtr buildType(Parser::TypeRefContext *context) {
     return nullptr;
 }
 
-TypePtr buildClosedCastType(Parser::ClosedCastTypeContext *context) {
+TypePtr buildClosedCastTypeImpl(Parser::ClosedCastTypeContext *context) {
     if (context->LPAREN() != nullptr) {
         if (auto *inner = context->typeRef()) {
             return buildType(inner);
@@ -368,6 +396,30 @@ Program AstBuilder::build(Parser::CrateContext *crate) const {
 }
 
 ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
+    ItemPtr result = buildItemImpl(context);
+    if (result != nullptr) {
+        result->setSpan(spanOf(context));
+    }
+    return result;
+}
+
+StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
+    StmtPtr result = buildStmtImpl(context);
+    if (result != nullptr) {
+        result->setSpan(spanOf(context));
+    }
+    return result;
+}
+
+ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
+    ExprPtr result = buildExprImpl(context);
+    if (result != nullptr) {
+        result->setSpan(spanOf(context));
+    }
+    return result;
+}
+
+ItemPtr AstBuilder::buildItemImpl(Parser::ItemContext *context) const {
     const auto buildFunctionItem =
         [this](Parser::FunctionDefinitionContext *function) {
             FunctionItem item;
@@ -428,11 +480,11 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
             for (auto *deriveName : attribute->deriveName()) {
                 traits.push_back(buildDeriveTrait(deriveName));
             }
-            item.attributes.emplace_back(std::move(traits));
+            item.attributes.push_back(DeriveAttribute(std::move(traits)));
         }
         for (auto *field : structure->structField()) {
-            item.fields.emplace_back(field->identifier()->getText(),
-                                     buildType(field->typeRef()));
+            item.fields.push_back(StructField(field->identifier()->getText(),
+                                              buildType(field->typeRef())));
         }
         if (auto *whereClause = structure->whereClause()) {
             item.whereClause = buildWhereClause(whereClause);
@@ -477,7 +529,7 @@ ItemPtr AstBuilder::buildItem(Parser::ItemContext *context) const {
     return nullptr;
 }
 
-StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
+StmtPtr AstBuilder::buildStmtImpl(Parser::StatementContext *context) const {
     if (auto *let = context->letStatement()) {
         auto statement = std::make_unique<LetStmt>();
         statement->binding = buildIdentifierBinding(let->identifierBinding());
@@ -505,7 +557,7 @@ StmtPtr AstBuilder::buildStmt(Parser::StatementContext *context) const {
     return nullptr;
 }
 
-ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
+ExprPtr AstBuilder::buildExprImpl(antlr4::ParserRuleContext *context) const {
     const auto buildBlock = [this](Parser::BlockExpressionContext *block) {
         std::vector<StmtPtr> statements;
         for (auto *statement : block->statement()) {
@@ -871,8 +923,9 @@ ExprPtr AstBuilder::buildExpr(antlr4::ParserRuleContext *context) const {
             if (auto *structFields = primary->structExprFields()) {
                 fields.reserve(structFields->structExprField().size());
                 for (auto *field : structFields->structExprField()) {
-                    fields.emplace_back(field->identifier()->getText(),
-                                        buildExpr(field->expression()));
+                    fields.push_back(StructExprField(
+                        field->identifier()->getText(),
+                        buildExpr(field->expression())));
                 }
             }
             return std::make_unique<StructExpr>(std::move(path),

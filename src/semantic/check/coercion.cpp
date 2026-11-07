@@ -1,18 +1,15 @@
 #include "coercion.hpp"
 
-#include "../ty/ty_compare.hpp"
+#include "../type/type_compare.hpp"
 
 namespace rx::semantic {
 
 namespace {
 
-// 从 place 类型 S 出发，沿内建 deref 链（&U→U、&mut U→U、Box<U>→U）
-// 能否到达 T；若途中穿过 shared reference 则置 crossedShared。
-bool derefReaches(const TyPtr &source, const TyPtr &target,
-                  bool &crossedShared) {
-    TyPtr current = source;
+bool derefReaches(const TypePtr &source, const TypePtr &target, bool &crossedShared) {
+    TypePtr current = source;
     for (;;) {
-        if (sameTy(current, target)) {
+        if (sameType(current, target)) {
             return true;
         }
         if (isReference(current)) {
@@ -30,10 +27,9 @@ bool derefReaches(const TyPtr &source, const TyPtr &target,
 
 } // namespace
 
-bool Coercion::canCoerce(const SymbolTable &table, const TyPtr &from,
-                         const TyPtr &to) {
+bool Coercion::canCoerce(const SymbolTable &table, const TypePtr &from, const TypePtr &to) {
     (void)table;
-    if (sameTy(from, to)) {
+    if (sameType(from, to)) {
         return true;
     }
     if (isNever(from)) {
@@ -42,34 +38,32 @@ bool Coercion::canCoerce(const SymbolTable &table, const TyPtr &from,
     if (isReference(from) && isReference(to)) {
         bool crossedShared = false;
         if (to->mutability == Mutability::Shared) {
-            // &S 或 &mut S → &T
+            // &S or &mut S → &T
             return derefReaches(from->inner, to->inner, crossedShared);
         }
-        // &mut S → &mut T：要求外层 &mut 且途中无 shared reference。
+        // &mut S → &mut T：途中无 shared reference。
         if (from->mutability != Mutability::Mutable) {
             return false;
         }
-        return derefReaches(from->inner, to->inner, crossedShared) &&
-               !crossedShared;
+        return derefReaches(from->inner, to->inner, crossedShared) && !crossedShared;
     }
     return false;
 }
 
-std::optional<TyPtr> Coercion::leastUpperBound(
-    const SymbolTable &table, const std::vector<TyPtr> &types) {
-    std::vector<TyPtr> remaining;
-    for (const TyPtr &type : types) {
+std::optional<TypePtr> Coercion::leastUpperBound(const SymbolTable &table, const std::vector<TypePtr> &types) {
+    std::vector<TypePtr> remaining;
+    for (const TypePtr &type : types) {
         if (!isNever(type)) {
             remaining.push_back(type);
         }
     }
     if (remaining.empty()) {
-        return Ty::makeNever();
+        return Type::makeNever();
     }
 
-    TyPtr target = remaining[0];
+    TypePtr target = remaining[0];
     for (std::size_t index = 1; index < remaining.size(); ++index) {
-        const TyPtr &candidate = remaining[index];
+        const TypePtr &candidate = remaining[index];
         if (canCoerce(table, candidate, target)) {
             continue;
         }

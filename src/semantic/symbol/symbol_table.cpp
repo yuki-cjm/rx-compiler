@@ -30,13 +30,11 @@ const Symbol *SymbolTable::lookupGlobalValue(const std::string &name) const {
     return values_.find(name);
 }
 
-bool SymbolTable::declareAssoc(StructId target, const std::string &name,
-                               Symbol symbol) {
+bool SymbolTable::declareAssoc(StructId target, const std::string &name, Symbol symbol) {
     return assoc_[target].insert(name, symbol);
 }
 
-const Symbol *SymbolTable::lookupAssoc(StructId target,
-                                       const std::string &name) const {
+const Symbol *SymbolTable::lookupAssoc(StructId target, const std::string &name) const {
     auto found = assoc_.find(target);
     if (found == assoc_.end()) {
         return nullptr;
@@ -57,8 +55,7 @@ const Symbol *SymbolTable::resolveValue(const std::string &name) const {
 
 StructId SymbolTable::allocateStructId() { return ++nextStructId_; }
 
-const FieldInfo *SymbolTable::lookupField(StructId structId,
-                                          const std::string &name) const {
+const FieldInfo *SymbolTable::lookupField(StructId structId, const std::string &name) const {
     const Symbol *symbol = lookupStruct(structId);
     if (symbol == nullptr) {
         return nullptr;

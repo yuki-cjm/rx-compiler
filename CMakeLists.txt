@@ -24,8 +24,7 @@ add_executable(rx-parse
     src/semantic/check/assign.cpp
     src/semantic/check/calls.cpp
     src/semantic/check/coercion.cpp
-    src/semantic/check/control_flow.cpp
-    src/semantic/check/infer.cpp
+    src/semantic/check/integer_infer.cpp
     src/semantic/check/main_check.cpp
     src/semantic/check/operators.cpp
     src/semantic/check/place.cpp
@@ -33,20 +32,17 @@ add_executable(rx-parse
     src/semantic/collect/collector.cpp
     src/semantic/collect/duplicate_check.cpp
     src/semantic/collect/impl_collect.cpp
-    src/semantic/consteval/const_deps.cpp
     src/semantic/consteval/const_eval.cpp
     src/semantic/diag/diagnostic.cpp
-    src/semantic/diag/span.cpp
     src/semantic/resolve/layout_check.cpp
     src/semantic/resolve/path_resolve.cpp
     src/semantic/resolve/resolver.cpp
     src/semantic/symbol/namespace.cpp
     src/semantic/symbol/scope.cpp
-    src/semantic/symbol/symbol.cpp
     src/semantic/symbol/symbol_table.cpp
-    src/semantic/ty/ty.cpp
-    src/semantic/ty/ty_compare.cpp
-    src/semantic/ty/ty_print.cpp
+    src/semantic/type/type.cpp
+    src/semantic/type/type_compare.cpp
+    src/semantic/type/type_print.cpp
     generated/Lexer.cpp
     generated/Parser.cpp
     generated/ParserBaseListener.cpp

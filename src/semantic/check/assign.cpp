@@ -6,7 +6,7 @@
 namespace rx::semantic {
 
 bool AssignChecker::check(const SymbolTable &table, const PlaceInfo &target,
-                          const TyPtr &valueType, Diagnostic &diag) {
+                          const TypePtr &valueType, Diagnostic &diag) {
     if (!target.isMutable) {
         diag.error("assignment to an immutable place");
         return false;
@@ -20,7 +20,7 @@ bool AssignChecker::check(const SymbolTable &table, const PlaceInfo &target,
 
 bool AssignChecker::checkCompound(const SymbolTable &table,
                                   const PlaceInfo &target, ast::BinaryOp op,
-                                  const TyPtr &rightType, Diagnostic &diag) {
+                                  const TypePtr &rightType, Diagnostic &diag) {
     if (!target.isMutable) {
         diag.error("compound assignment to an immutable place");
         return false;

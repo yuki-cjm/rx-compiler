@@ -1,17 +1,16 @@
 #include "typeck.hpp"
 
+#include "../builtin/builtin_traits.hpp"
+#include "../consteval/const_eval.hpp"
+#include "../resolve/path_resolve.hpp"
+#include "../resolve/resolver.hpp"
+#include "../type/type_compare.hpp"
 #include "assign.hpp"
 #include "calls.hpp"
 #include "coercion.hpp"
-#include "control_flow.hpp"
-#include "infer.hpp"
+#include "integer_infer.hpp"
 #include "operators.hpp"
 #include "place.hpp"
-#include "../resolve/resolver.hpp"
-#include "../resolve/path_resolve.hpp"
-#include "../consteval/const_eval.hpp"
-#include "../builtin/builtin_traits.hpp"
-#include "../ty/ty_compare.hpp"
 
 #include <any>
 #include <set>
@@ -28,11 +27,13 @@ bool TypeChecker::check(const ast::Program &program) {
         } else if (auto *implementation =
                        dynamic_cast<ast::ImplItem *>(item.get())) {
             TypeResolver resolver(table_, diag_);
-            TyPtr target = resolver.resolve(*implementation->typeName, nullptr);
+            TypePtr target =
+                resolver.resolve(*implementation->typeName, nullptr);
             if (target != nullptr && isStruct(target)) {
-                for (const ast::ItemPtr &associated : implementation->associatedItems) {
-                    if (auto *function =
-                            dynamic_cast<ast::FunctionItem *>(associated.get())) {
+                for (const ast::ItemPtr &associated :
+                     implementation->associatedItems) {
+                    if (auto *function = dynamic_cast<ast::FunctionItem *>(
+                            associated.get())) {
                         checkFunctionBody(*function, target);
                     }
                 }
@@ -43,11 +44,11 @@ bool TypeChecker::check(const ast::Program &program) {
 }
 
 void TypeChecker::checkFunctionBody(ast::FunctionItem &function,
-                                    const TyPtr &selfType) {
+                                    const TypePtr &selfType) {
     TypeResolver resolver(table_, diag_);
-    TyPtr returnType = function.returnType != nullptr
-                           ? resolver.resolve(*function.returnType, selfType)
-                           : Ty::makeUnit();
+    TypePtr returnType = function.returnType != nullptr
+                             ? resolver.resolve(*function.returnType, selfType)
+                             : Type::makeUnit();
 
     auto savedReturn = currentReturn_;
     auto savedSelf = currentSelf_;
@@ -67,14 +68,14 @@ void TypeChecker::checkFunctionBody(ast::FunctionItem &function,
         } else {
             Mutability mutability =
                 self.isMutable ? Mutability::Mutable : Mutability::Shared;
-            symbol.type = Ty::makeReference(selfType, mutability);
+            symbol.type = Type::makeReference(selfType, mutability);
             symbol.isMutable = false;
         }
         table_.scope().declare("self", symbol);
     }
 
     for (const ast::FunctionParam &parameter : function.parameters) {
-        TyPtr type = resolver.resolve(*parameter.type, selfType);
+        TypePtr type = resolver.resolve(*parameter.type, selfType);
         Symbol symbol;
         symbol.kind = SymbolKind::Local;
         symbol.name = parameter.binding.name;
@@ -90,21 +91,21 @@ void TypeChecker::checkFunctionBody(ast::FunctionItem &function,
     currentSelf_ = savedSelf;
 }
 
-TyPtr TypeChecker::resolveConstantType(const Symbol &symbol) {
+TypePtr TypeChecker::resolveConstantType(const Symbol &symbol) {
     if (symbol.constant == nullptr) {
         return nullptr;
     }
     TypeResolver resolver(table_, diag_);
-    TyPtr selfType =
-        symbol.implTarget != 0 ? Ty::makeStruct(symbol.implTarget) : nullptr;
+    TypePtr selfType =
+        symbol.implTarget != 0 ? Type::makeStruct(symbol.implTarget) : nullptr;
     return resolver.resolve(*symbol.constant->type, selfType);
 }
 
-TyPtr TypeChecker::checkExpr(ast::Expr &expr,
-                             const std::optional<TyPtr> &expected) {
+TypePtr TypeChecker::checkExpr(ast::Expr &expr,
+                               const std::optional<TypePtr> &expected) {
     auto saved = expected_;
     expected_ = expected;
-    TyPtr result = std::any_cast<TyPtr>(expr.accept(*this));
+    TypePtr result = std::any_cast<TypePtr>(expr.accept(*this));
     expected_ = saved;
 
     // 共享访问的 place 若持有 &mut T，读出的值降级为 &T。
@@ -112,26 +113,27 @@ TyPtr TypeChecker::checkExpr(ast::Expr &expr,
         result->mutability == Mutability::Mutable) {
         auto place = classifyPlace(expr);
         if (place && place->access == PlaceAccess::Shared) {
-            result = Ty::makeReference(result->inner, Mutability::Shared);
+            result = Type::makeReference(result->inner, Mutability::Shared);
         }
     }
 
-    if (result != nullptr && expected && !sameTy(result, *expected)) {
+    if (result != nullptr && expected && !sameType(result, *expected)) {
         if (Coercion::canCoerce(table_, result, *expected)) {
             result = *expected;
         } else {
-            diag_.error("expression does not coerce to the expected type");
+            diag_.error(expr.span(),
+                        "expression does not coerce to the expected type");
         }
     }
     recordType(expr, result);
     return result;
 }
 
-void TypeChecker::recordType(const ast::Expr &expr, const TyPtr &ty) {
-    exprTypes_[&expr] = ty;
+void TypeChecker::recordType(const ast::Expr &expr, const TypePtr &type) {
+    exprTypes_[&expr] = type;
 }
 
-TyPtr TypeChecker::typeOf(const ast::Expr &expr) const {
+TypePtr TypeChecker::typeOf(const ast::Expr &expr) const {
     auto found = exprTypes_.find(&expr);
     return found == exprTypes_.end() ? nullptr : found->second;
 }
@@ -146,8 +148,8 @@ TypeChecker::classifyPlace(ast::Expr &expr) {
         }
         PlaceResult result;
         result.type = symbol->type;
-        result.access = symbol->isMutable ? PlaceAccess::Mutable
-                                          : PlaceAccess::Owned;
+        result.access =
+            symbol->isMutable ? PlaceAccess::Mutable : PlaceAccess::Owned;
         return result;
     }
 
@@ -155,7 +157,7 @@ TypeChecker::classifyPlace(ast::Expr &expr) {
         if (unary->op != ast::UnaryOp::Dereference) {
             return std::nullopt;
         }
-        TyPtr type = typeOf(*unary->operand);
+        TypePtr type = typeOf(*unary->operand);
         if (type == nullptr || (!isReference(type) && !isBox(type))) {
             return std::nullopt;
         }
@@ -178,15 +180,16 @@ TypeChecker::classifyPlace(ast::Expr &expr) {
     }
 
     if (auto *field = dynamic_cast<ast::FieldAccessExpr *>(&expr)) {
-        TyPtr current = typeOf(*field->operand);
+        TypePtr current = typeOf(*field->operand);
         PlaceAccess access = baseAccess(*field->operand);
         while (current != nullptr && !isStruct(current)) {
             if (isReference(current)) {
                 if (current->mutability == Mutability::Shared) {
                     access = PlaceAccess::Shared;
                 } else {
-                    access = access == PlaceAccess::Shared ? PlaceAccess::Shared
-                                                           : PlaceAccess::Mutable;
+                    access = access == PlaceAccess::Shared
+                                 ? PlaceAccess::Shared
+                                 : PlaceAccess::Mutable;
                 }
                 current = current->inner;
             } else if (isBox(current)) {
@@ -210,15 +213,16 @@ TypeChecker::classifyPlace(ast::Expr &expr) {
     }
 
     if (auto *index = dynamic_cast<ast::IndexExpr *>(&expr)) {
-        TyPtr current = typeOf(*index->operand);
+        TypePtr current = typeOf(*index->operand);
         PlaceAccess access = baseAccess(*index->operand);
         while (current != nullptr && !isArray(current) && !isVec(current)) {
             if (isReference(current)) {
                 if (current->mutability == Mutability::Shared) {
                     access = PlaceAccess::Shared;
                 } else {
-                    access = access == PlaceAccess::Shared ? PlaceAccess::Shared
-                                                           : PlaceAccess::Mutable;
+                    access = access == PlaceAccess::Shared
+                                 ? PlaceAccess::Shared
+                                 : PlaceAccess::Mutable;
                 }
                 current = current->inner;
             } else if (isBox(current)) {
@@ -238,8 +242,9 @@ TypeChecker::classifyPlace(ast::Expr &expr) {
         }
         if (isVec(current)) {
             result.type = current->inner;
-            result.access = access == PlaceAccess::Mutable ? PlaceAccess::Mutable
-                                                           : PlaceAccess::Shared;
+            result.access = access == PlaceAccess::Mutable
+                                ? PlaceAccess::Mutable
+                                : PlaceAccess::Shared;
             return result;
         }
         return std::nullopt;
@@ -328,22 +333,22 @@ std::any TypeChecker::visitUseItem(ast::UseItem *node) {
 
 std::any TypeChecker::visitEmptyStmt(ast::EmptyStmt *node) {
     (void)node;
-    return std::any(Ty::makeUnit());
+    return std::any(Type::makeUnit());
 }
 
 std::any TypeChecker::visitLetStmt(ast::LetStmt *node) {
-    TyPtr expected = nullptr;
+    TypePtr expected = nullptr;
     if (node->type != nullptr) {
         TypeResolver resolver(table_, diag_);
         expected = resolver.resolve(*node->type, currentSelf_);
         if (expected == nullptr) {
-            return std::any(Ty::makeUnit());
+            return std::any(Type::makeUnit());
         }
     }
-    TyPtr initializer =
+    TypePtr initializer =
         checkExpr(*node->initializer,
-                  expected ? std::optional<TyPtr>(expected) : std::nullopt);
-    TyPtr bindingType = expected != nullptr ? expected : initializer;
+                  expected ? std::optional<TypePtr>(expected) : std::nullopt);
+    TypePtr bindingType = expected != nullptr ? expected : initializer;
 
     Symbol symbol;
     symbol.kind = SymbolKind::Local;
@@ -351,7 +356,7 @@ std::any TypeChecker::visitLetStmt(ast::LetStmt *node) {
     symbol.type = bindingType;
     symbol.isMutable = node->binding.isMutable;
     table_.scope().declare(node->binding.name, symbol);
-    return std::any(Ty::makeUnit());
+    return std::any(Type::makeUnit());
 }
 
 std::any TypeChecker::visitExprStmt(ast::ExprStmt *node) {
@@ -360,9 +365,9 @@ std::any TypeChecker::visitExprStmt(ast::ExprStmt *node) {
         dynamic_cast<ast::IfExpr *>(node->expression.get()) != nullptr ||
         dynamic_cast<ast::LoopExpr *>(node->expression.get()) != nullptr ||
         dynamic_cast<ast::WhileExpr *>(node->expression.get()) != nullptr;
-    TyPtr type;
+    TypePtr type;
     if (withBlock && !node->hasSemicolon) {
-        type = checkExpr(*node->expression, Ty::makeUnit());
+        type = checkExpr(*node->expression, Type::makeUnit());
     } else {
         type = checkExpr(*node->expression, std::nullopt);
     }
@@ -377,19 +382,19 @@ std::any TypeChecker::visitIntegerLiteralExpr(ast::IntegerLiteralExpr *node) {
 
 std::any TypeChecker::visitBooleanLiteralExpr(ast::BooleanLiteralExpr *node) {
     (void)node;
-    return std::any(Ty::makeScalar(TyKind::Bool));
+    return std::any(Type::makeScalar(TypeKind::Bool));
 }
 
 std::any TypeChecker::visitUnitExpr(ast::UnitExpr *node) {
     (void)node;
-    return std::any(Ty::makeUnit());
+    return std::any(Type::makeUnit());
 }
 
 std::any TypeChecker::visitPathInExpr(ast::PathInExpr *node) {
     PathResolver resolver(table_, diag_);
     const Symbol *symbol = resolver.resolveValuePath(*node, currentSelf_);
     if (symbol == nullptr) {
-        return std::any(TyPtr(nullptr));
+        return std::any(TypePtr(nullptr));
     }
     if (symbol->kind == SymbolKind::Local) {
         return std::any(symbol->type);
@@ -398,28 +403,27 @@ std::any TypeChecker::visitPathInExpr(ast::PathInExpr *node) {
         return std::any(resolveConstantType(*symbol));
     }
     // 函数值（function item as value）是 undefined behavior，返回空类型。
-    return std::any(TyPtr(nullptr));
+    return std::any(TypePtr(nullptr));
 }
 
 std::any TypeChecker::visitCallExpr(ast::CallExpr *node) {
     if (auto *fieldAccess =
             dynamic_cast<ast::FieldAccessExpr *>(node->callee.get())) {
-        // 方法调用：receiver.method(args)。
         if (fieldAccess->field.genericArgs.has_value()) {
-            diag_.error("method segments have no type parameters");
+            diag_.error(node->span(),
+                        "method segments have no type parameters");
         }
-        TyPtr receiverType = checkExpr(*fieldAccess->operand, std::nullopt);
+        TypePtr receiverType = checkExpr(*fieldAccess->operand, std::nullopt);
         std::string methodName = fieldAccess->field.ident.name;
-        auto signature = resolveMethod(table_, diag_, receiverType, methodName,
-                                       currentSelf_);
+        auto signature = resolveMethod(table_, diag_, receiverType, methodName);
         if (!signature) {
-            return std::any(TyPtr(nullptr));
+            return std::any(TypePtr(nullptr));
         }
         if (signature->receiver == ReceiverKind::Mutable) {
             PlaceAccess access = baseAccess(*fieldAccess->operand);
-            TyPtr current = receiverType;
+            TypePtr current = receiverType;
             while (current != nullptr && signature->selfType != nullptr &&
-                   !sameTy(current, signature->selfType)) {
+                   !sameType(current, signature->selfType)) {
                 if (isReference(current)) {
                     if (current->mutability == Mutability::Shared) {
                         access = PlaceAccess::Shared;
@@ -436,11 +440,11 @@ std::any TypeChecker::visitCallExpr(ast::CallExpr *node) {
                 }
             }
             if (access != PlaceAccess::Mutable) {
-                diag_.error("method requires a mutable receiver");
+                diag_.error(node->span(), "method requires a mutable receiver");
             }
         }
         if (node->arguments.size() != signature->params.size()) {
-            diag_.error("argument count mismatch");
+            diag_.error(node->span(), "argument count mismatch");
         } else {
             for (std::size_t index = 0; index < node->arguments.size();
                  ++index) {
@@ -453,10 +457,10 @@ std::any TypeChecker::visitCallExpr(ast::CallExpr *node) {
     // 普通 / 关联函数调用。
     auto signature = resolveCallable(table_, diag_, *node, currentSelf_);
     if (!signature) {
-        return std::any(TyPtr(nullptr));
+        return std::any(TypePtr(nullptr));
     }
     if (node->arguments.size() != signature->params.size()) {
-        diag_.error("argument count mismatch");
+        diag_.error(node->span(), "argument count mismatch");
     } else {
         for (std::size_t index = 0; index < node->arguments.size(); ++index) {
             checkExpr(*node->arguments[index], signature->params[index]);
@@ -466,11 +470,11 @@ std::any TypeChecker::visitCallExpr(ast::CallExpr *node) {
 }
 
 std::any TypeChecker::visitIndexExpr(ast::IndexExpr *node) {
-    TyPtr baseType = checkExpr(*node->operand, std::nullopt);
-    TyPtr indexType =
-        checkExpr(*node->index, Ty::makeScalar(TyKind::Usize));
+    TypePtr baseType = checkExpr(*node->operand, std::nullopt);
+    TypePtr indexType =
+        checkExpr(*node->index, Type::makeScalar(TypeKind::Usize));
 
-    TyPtr current = baseType;
+    TypePtr current = baseType;
     while (current != nullptr && !isArray(current) && !isVec(current)) {
         if (isReference(current) || isBox(current)) {
             current = current->inner;
@@ -479,110 +483,113 @@ std::any TypeChecker::visitIndexExpr(ast::IndexExpr *node) {
         }
     }
     if (current == nullptr || (!isArray(current) && !isVec(current))) {
-        diag_.error("value is not indexable");
-        return std::any(TyPtr(nullptr));
+        diag_.error(node->span(), "value is not indexable");
+        return std::any(TypePtr(nullptr));
     }
     return std::any(current->inner);
 }
 
 std::any TypeChecker::visitFieldAccessExpr(ast::FieldAccessExpr *node) {
-    TyPtr baseType = checkExpr(*node->operand, std::nullopt);
+    TypePtr baseType = checkExpr(*node->operand, std::nullopt);
     StructId structId = 0;
     bool crossedShared = false;
     if (!PlaceRules::stripToStruct(baseType, &structId, &crossedShared)) {
-        diag_.error("field access requires a struct");
-        return std::any(TyPtr(nullptr));
+        diag_.error(node->span(), "field access requires a struct");
+        return std::any(TypePtr(nullptr));
     }
     const FieldInfo *field =
         table_.lookupField(structId, node->field.ident.name);
     if (field == nullptr) {
-        diag_.error("unknown field '" + node->field.ident.name + "'");
-        return std::any(TyPtr(nullptr));
+        diag_.error(node->span(),
+                    "unknown field '" + node->field.ident.name + "'");
+        return std::any(TypePtr(nullptr));
     }
     return std::any(field->type);
 }
 
 std::any TypeChecker::visitUnaryExpr(ast::UnaryExpr *node) {
-    TyPtr operand = checkExpr(*node->operand, std::nullopt);
+    TypePtr operand = checkExpr(*node->operand, std::nullopt);
 
     if (node->op == ast::UnaryOp::BorrowMut ||
         node->op == ast::UnaryOp::DoubleBorrowMut) {
         auto place = classifyPlace(*node->operand);
         if (place && place->access != PlaceAccess::Mutable) {
-            diag_.error("cannot mutably borrow an immutable place");
+            diag_.error(node->span(),
+                        "cannot mutably borrow an immutable place");
         }
     }
 
     auto result = Operators::unaryResult(node->op, operand);
     if (!result) {
-        diag_.error("invalid operand for unary operator");
-        return std::any(TyPtr(nullptr));
+        diag_.error(node->span(), "invalid operand for unary operator");
+        return std::any(TypePtr(nullptr));
     }
     return std::any(*result);
 }
 
 std::any TypeChecker::visitCastExpr(ast::CastExpr *node) {
-    TyPtr operand = checkExpr(*node->operand, std::nullopt);
+    TypePtr operand = checkExpr(*node->operand, std::nullopt);
     TypeResolver resolver(table_, diag_);
-    TyPtr target = resolver.resolve(*node->targetType, currentSelf_);
+    TypePtr target = resolver.resolve(*node->targetType, currentSelf_);
     if (target == nullptr) {
-        return std::any(TyPtr(nullptr));
+        return std::any(TypePtr(nullptr));
     }
     bool valid = (isInteger(operand) && isInteger(target)) ||
                  (isBool(operand) && isInteger(target));
     if (!valid) {
-        diag_.error("unsupported cast");
+        diag_.error(node->span(), "unsupported cast");
     }
     return std::any(target);
 }
 
 std::any TypeChecker::visitBinaryExpr(ast::BinaryExpr *node) {
     if (Operators::isAssignment(node->op)) {
-        TyPtr leftType = checkExpr(*node->left, std::nullopt);
+        TypePtr leftType = checkExpr(*node->left, std::nullopt);
         auto place = classifyPlace(*node->left);
         if (!place) {
-            diag_.error("assignment target is not a place");
-            return std::any(Ty::makeUnit());
+            diag_.error(node->span(), "assignment target is not a place");
+            return std::any(Type::makeUnit());
         }
         PlaceInfo target{place->type, place->access == PlaceAccess::Mutable};
-        TyPtr rightType =
-            checkExpr(*node->right, std::optional<TyPtr>(place->type));
+        TypePtr rightType =
+            checkExpr(*node->right, std::optional<TypePtr>(place->type));
         AssignChecker::check(table_, target, rightType, diag_);
-        return std::any(Ty::makeUnit());
+        return std::any(Type::makeUnit());
     }
 
     if (Operators::isCompoundAssignment(node->op)) {
-        TyPtr leftType = checkExpr(*node->left, std::nullopt);
+        TypePtr leftType = checkExpr(*node->left, std::nullopt);
         auto place = classifyPlace(*node->left);
         if (!place) {
-            diag_.error("compound assignment target is not a place");
-            return std::any(Ty::makeUnit());
+            diag_.error(node->span(),
+                        "compound assignment target is not a place");
+            return std::any(Type::makeUnit());
         }
         PlaceInfo target{place->type, place->access == PlaceAccess::Mutable};
-        TyPtr rightType = checkExpr(*node->right, std::nullopt);
+        TypePtr rightType = checkExpr(*node->right, std::nullopt);
         AssignChecker::checkCompound(table_, target, node->op, rightType,
                                      diag_);
-        return std::any(Ty::makeUnit());
+        return std::any(Type::makeUnit());
     }
 
-    TyPtr leftType = checkExpr(*node->left, std::nullopt);
-    TyPtr rightType = checkExpr(*node->right, std::nullopt);
+    TypePtr leftType = checkExpr(*node->left, std::nullopt);
+    TypePtr rightType = checkExpr(*node->right, std::nullopt);
     auto result = Operators::binaryResult(node->op, leftType, rightType);
     if (!result) {
-        diag_.error("invalid operands for binary operator");
-        return std::any(Ty::makeNever());
+        diag_.error(node->span(), "invalid operands for binary operator");
+        return std::any(Type::makeNever());
     }
     if (node->op == ast::BinaryOp::Equal ||
         node->op == ast::BinaryOp::NotEqual) {
         if (!supportsPartialEq(table_, leftType)) {
-            diag_.error("equality requires PartialEq");
+            diag_.error(node->span(), "equality requires PartialEq");
         }
     }
     return std::any(*result);
 }
 
 std::any TypeChecker::visitArrayExpr(ast::ArrayExpr *node) {
-    TyPtr expectedElement = nullptr;
+    TypePtr expectedElement = nullptr;
     std::uint64_t expectedLength = 0;
     if (expected_ && isArray(*expected_)) {
         expectedElement = (*expected_)->inner;
@@ -590,43 +597,43 @@ std::any TypeChecker::visitArrayExpr(ast::ArrayExpr *node) {
     }
 
     if (node->repeatCount.has_value()) {
-        TyPtr element = checkExpr(
-            *node->elements[0],
-            expectedElement ? std::optional<TyPtr>(expectedElement)
-                            : std::nullopt);
+        TypePtr element =
+            checkExpr(*node->elements[0],
+                      expectedElement ? std::optional<TypePtr>(expectedElement)
+                                      : std::nullopt);
         auto length = evaluateArrayLength(table_, diag_, *node->repeatCount,
                                           currentSelf_);
         if (!length) {
-            return std::any(TyPtr(nullptr));
+            return std::any(TypePtr(nullptr));
         }
         if (expected_ && isArray(*expected_) && *length != expectedLength) {
-            diag_.error("array length mismatch");
+            diag_.error(node->span(), "array length mismatch");
         }
         if (*length > 1 && !isCopy(table_, element)) {
-            diag_.error("repeating an element more than once requires Copy");
+            diag_.error(node->span(),
+                        "repeating an element more than once requires Copy");
         }
-        return std::any(Ty::makeArray(element, *length));
+        return std::any(Type::makeArray(element, *length));
     }
 
-    std::vector<TyPtr> elementTypes;
+    std::vector<TypePtr> elementTypes;
     for (ast::ExprPtr &element : node->elements) {
-        elementTypes.push_back(
-            checkExpr(*element,
-                      expectedElement ? std::optional<TyPtr>(expectedElement)
+        elementTypes.push_back(checkExpr(
+            *element, expectedElement ? std::optional<TypePtr>(expectedElement)
                                       : std::nullopt));
     }
     if (expected_ && isArray(*expected_) &&
         node->elements.size() != expectedLength) {
-        diag_.error("array length mismatch");
+        diag_.error(node->span(), "array length mismatch");
     }
-    TyPtr elementType;
+    TypePtr elementType;
     if (expectedElement != nullptr) {
         elementType = expectedElement;
     } else {
         auto lub = Coercion::leastUpperBound(table_, elementTypes);
-        elementType = lub ? *lub : Ty::makeNever();
+        elementType = lub ? *lub : Type::makeNever();
     }
-    return std::any(Ty::makeArray(elementType, node->elements.size()));
+    return std::any(Type::makeArray(elementType, node->elements.size()));
 }
 
 std::any TypeChecker::visitBlockExpr(ast::BlockExpr *node) {
@@ -640,11 +647,11 @@ std::any TypeChecker::visitBlockExpr(ast::BlockExpr *node) {
         }
     }
 
-    TyPtr result;
+    TypePtr result;
     if (node->tail != nullptr) {
         result = checkExpr(*node->tail, expected_);
     } else {
-        result = blockDiverges ? Ty::makeNever() : Ty::makeUnit();
+        result = blockDiverges ? Type::makeNever() : Type::makeUnit();
     }
 
     table_.scope().pop();
@@ -652,42 +659,43 @@ std::any TypeChecker::visitBlockExpr(ast::BlockExpr *node) {
 }
 
 std::any TypeChecker::visitIfExpr(ast::IfExpr *node) {
-    TyPtr condition = checkExpr(*node->condition, Ty::makeScalar(TyKind::Bool));
+    TypePtr condition =
+        checkExpr(*node->condition, Type::makeScalar(TypeKind::Bool));
     if (!isBool(condition)) {
-        diag_.error("if condition must be bool");
+        diag_.error(node->span(), "if condition must be bool");
     }
 
     if (node->elseBranch != nullptr) {
-        TyPtr thenType = checkExpr(
+        TypePtr thenType = checkExpr(
             node->thenBranch,
-            expected_ ? std::optional<TyPtr>(*expected_) : std::nullopt);
-        TyPtr elseType = checkExpr(
+            expected_ ? std::optional<TypePtr>(*expected_) : std::nullopt);
+        TypePtr elseType = checkExpr(
             *node->elseBranch,
-            expected_ ? std::optional<TyPtr>(*expected_) : std::nullopt);
+            expected_ ? std::optional<TypePtr>(*expected_) : std::nullopt);
         if (expected_) {
             return std::any(*expected_);
         }
         auto lub = Coercion::leastUpperBound(table_, {thenType, elseType});
         if (!lub) {
-            diag_.error("incompatible if branches");
-            return std::any(Ty::makeNever());
+            diag_.error(node->span(), "incompatible if branches");
+            return std::any(Type::makeNever());
         }
         return std::any(*lub);
     }
 
-    TyPtr thenType = checkExpr(node->thenBranch, Ty::makeUnit());
+    TypePtr thenType = checkExpr(node->thenBranch, Type::makeUnit());
     (void)thenType;
-    return std::any(Ty::makeUnit());
+    return std::any(Type::makeUnit());
 }
 
 std::any TypeChecker::visitLoopExpr(ast::LoopExpr *node) {
     loopDepth_++;
     loopIsWhile_.push_back(false);
-    loopBreakValues_.emplace_back();
+    loopBreakValues_.push_back({});
     auto savedBreak = currentLoopBreak_;
     currentLoopBreak_ = expected_;
 
-    checkExpr(node->body, Ty::makeUnit());
+    checkExpr(node->body, Type::makeUnit());
 
     auto breaks = std::move(loopBreakValues_.back());
     loopBreakValues_.pop_back();
@@ -699,142 +707,158 @@ std::any TypeChecker::visitLoopExpr(ast::LoopExpr *node) {
         return std::any(*expected_);
     }
     if (breaks.empty()) {
-        return std::any(Ty::makeNever());
+        return std::any(Type::makeNever());
     }
     auto lub = Coercion::leastUpperBound(table_, breaks);
     if (!lub) {
-        diag_.error("incompatible break values");
-        return std::any(Ty::makeNever());
+        diag_.error(node->span(), "incompatible break values");
+        return std::any(Type::makeNever());
     }
     return std::any(*lub);
 }
 
 std::any TypeChecker::visitWhileExpr(ast::WhileExpr *node) {
     conditionBarriers_.push_back(loopDepth_);
-    TyPtr condition = checkExpr(*node->condition, Ty::makeScalar(TyKind::Bool));
+    TypePtr condition =
+        checkExpr(*node->condition, Type::makeScalar(TypeKind::Bool));
     conditionBarriers_.pop_back();
     if (!isBool(condition)) {
-        diag_.error("while condition must be bool");
+        diag_.error(node->span(), "while condition must be bool");
     }
 
     loopDepth_++;
     loopIsWhile_.push_back(true);
-    loopBreakValues_.emplace_back();
-    checkExpr(node->body, Ty::makeUnit());
+    loopBreakValues_.push_back({});
+    checkExpr(node->body, Type::makeUnit());
     loopBreakValues_.pop_back();
     loopIsWhile_.pop_back();
     loopDepth_--;
 
-    return std::any(Ty::makeUnit());
+    return std::any(Type::makeUnit());
 }
 
 std::any TypeChecker::visitBreakExpr(ast::BreakExpr *node) {
     if (loopDepth_ <= 0) {
-        diag_.error("break used outside a loop");
-        return std::any(Ty::makeNever());
+        diag_.error(node->span(), "break used outside a loop");
+        return std::any(Type::makeNever());
     }
     if (!conditionBarriers_.empty() &&
         loopDepth_ <= conditionBarriers_.back()) {
-        diag_.error("break in a while condition cannot target an outer loop");
-        return std::any(Ty::makeNever());
+        diag_.error(node->span(),
+                    "break in a while condition cannot target an outer loop");
+        return std::any(Type::makeNever());
     }
 
     if (node->value != nullptr) {
         if (loopIsWhile_.back()) {
-            diag_.error("a while loop cannot accept a break value");
+            diag_.error(node->span(),
+                        "a while loop cannot accept a break value");
         } else {
-            TyPtr value = checkExpr(
-                *node->value,
-                currentLoopBreak_ ? std::optional<TyPtr>(*currentLoopBreak_)
+            TypePtr value = checkExpr(
+                *node->value, currentLoopBreak_
+                                  ? std::optional<TypePtr>(*currentLoopBreak_)
                                   : std::nullopt);
             loopBreakValues_.back().push_back(value);
         }
     } else if (!loopIsWhile_.back()) {
-        loopBreakValues_.back().push_back(Ty::makeUnit());
+        loopBreakValues_.back().push_back(Type::makeUnit());
     }
-    return std::any(Ty::makeNever());
+    return std::any(Type::makeNever());
 }
 
 std::any TypeChecker::visitReturnExpr(ast::ReturnExpr *node) {
-    TyPtr valueType;
+    TypePtr valueType;
     if (node->value != nullptr) {
-        valueType = checkExpr(
-            *node->value,
-            currentReturn_ ? std::optional<TyPtr>(*currentReturn_)
-                           : std::nullopt);
+        valueType =
+            checkExpr(*node->value,
+                      currentReturn_ ? std::optional<TypePtr>(*currentReturn_)
+                                     : std::nullopt);
     } else {
-        valueType = Ty::makeUnit();
+        valueType = Type::makeUnit();
     }
     if (currentReturn_ && !isNever(valueType) &&
         !Coercion::canCoerce(table_, valueType, *currentReturn_)) {
-        diag_.error("return value does not match the function return type");
+        diag_.error(node->span(),
+                    "return value does not match the function return type");
     }
-    return std::any(Ty::makeNever());
+    return std::any(Type::makeNever());
 }
 
 std::any TypeChecker::visitContinueExpr(ast::ContinueExpr *node) {
     (void)node;
     if (loopDepth_ <= 0) {
-        diag_.error("continue used outside a loop");
+        diag_.error(node->span(), "continue used outside a loop");
     } else if (!conditionBarriers_.empty() &&
                loopDepth_ <= conditionBarriers_.back()) {
-        diag_.error("continue in a while condition cannot target an outer loop");
+        diag_.error(
+            node->span(),
+            "continue in a while condition cannot target an outer loop");
     }
-    return std::any(Ty::makeNever());
+    return std::any(Type::makeNever());
 }
 
 std::any TypeChecker::visitStructExpr(ast::StructExpr *node) {
     const ast::PathInExpr &path = node->path;
     StructId structId = 0;
     if (path.segments.size() != 1) {
-        diag_.error("struct expression path must be a single name");
-        return std::any(TyPtr(nullptr));
+        diag_.error(node->span(),
+                    "struct expression path must be a single name");
+        return std::any(TypePtr(nullptr));
     }
     const ast::PathExprSegment &segment = path.segments[0];
     if (segment.ident.kind == ast::PathSegmentKind::SelfType) {
         if (!isStruct(currentSelf_)) {
-            diag_.error("'Self' used outside a struct context");
-            return std::any(TyPtr(nullptr));
+            diag_.error(node->span(), "'Self' used outside a struct context");
+            return std::any(TypePtr(nullptr));
         }
         structId = currentSelf_->structId;
     } else if (segment.ident.kind == ast::PathSegmentKind::Ident) {
         const Symbol *symbol = table_.lookupType(segment.ident.name);
-        if (symbol == nullptr || symbol->kind != SymbolKind::Struct) {
-            diag_.error("'" + segment.ident.name + "' is not a struct");
-            return std::any(TyPtr(nullptr));
+        if (symbol == nullptr) {
+            diag_.error(node->span(),
+                        "unresolved type name '" + segment.ident.name + "'");
+            return std::any(TypePtr(nullptr));
+        }
+        if (symbol->kind != SymbolKind::Struct) {
+            diag_.error(node->span(),
+                        "'" + segment.ident.name + "' is not a struct");
+            return std::any(TypePtr(nullptr));
         }
         structId = symbol->structId;
     } else {
-        diag_.error("invalid struct expression path");
-        return std::any(TyPtr(nullptr));
+        diag_.error(node->span(), "invalid struct expression path");
+        return std::any(TypePtr(nullptr));
     }
 
     const Symbol *structure = table_.lookupStruct(structId);
     std::set<std::string> initialized;
     for (const ast::StructExprField &field : node->fields) {
         if (!initialized.insert(field.name).second) {
-            diag_.error("duplicate struct field '" + field.name + "'");
+            diag_.error(node->span(),
+                        "duplicate struct field '" + field.name + "'");
         }
         const FieldInfo *info = table_.lookupField(structId, field.name);
         if (info == nullptr) {
-            diag_.error("unknown struct field '" + field.name + "'");
+            diag_.error(node->span(),
+                        "unknown struct field '" + field.name + "'");
             continue;
         }
         checkExpr(*field.value, info->type);
     }
     for (const FieldInfo &info : structure->fields) {
         if (initialized.count(info.name) == 0) {
-            diag_.error("missing struct field '" + info.name + "'");
+            diag_.error(node->span(),
+                        "missing struct field '" + info.name + "'");
         }
     }
-    return std::any(Ty::makeStruct(structId));
+    return std::any(Type::makeStruct(structId));
 }
 
 // ---- Types ----
 
 std::any TypeChecker::visitUnitType(ast::UnitType *node) {
     (void)node;
-    return std::any(Ty::makeUnit());
+    return std::any(Type::makeUnit());
 }
 
 std::any TypeChecker::visitPathType(ast::PathType *node) {

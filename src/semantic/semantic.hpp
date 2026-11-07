@@ -16,10 +16,9 @@ namespace rx::semantic {
 //   // ok == false 时，sema.diagnostics() 含全部错误消息。
 class SemanticAnalyzer {
   public:
-    // 对程序执行完整语义分析。返回 true 表示接受（无错误）。
     bool check(const ast::Program &program);
 
-    // 诊断信息（含全部错误消息）。
+    // 诊断信息
     const Diagnostic &diagnostics() const;
 
   private:

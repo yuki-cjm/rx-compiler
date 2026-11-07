@@ -1,7 +1,7 @@
 #include "impl_collect.hpp"
 
 #include "../resolve/resolver.hpp"
-#include "../ty/ty.hpp"
+#include "../type/type.hpp"
 #include "duplicate_check.hpp"
 
 namespace rx::semantic {
@@ -11,12 +11,12 @@ ImplCollector::ImplCollector(SymbolTable &table, Diagnostic &diag)
 
 void ImplCollector::collect(const ast::ImplItem &item) {
     TypeResolver resolver(table_, diag_);
-    TyPtr target = resolver.resolve(*item.typeName, nullptr);
+    TypePtr target = resolver.resolve(*item.typeName, nullptr);
     if (target == nullptr) {
         return;
     }
     if (!isStruct(target)) {
-        diag_.error("impl target must be a user-defined struct");
+        diag_.error(item.span(), "impl target must be a user-defined struct");
         return;
     }
 
@@ -33,8 +33,9 @@ void ImplCollector::collect(const ast::ImplItem &item) {
             symbol.hasReceiver = function->selfParam.has_value();
             symbol.implTarget = structId;
             if (!table_.declareAssoc(structId, function->name, symbol)) {
-                diag_.error("duplicate associated item '" + function->name +
-                            "'");
+                diag_.error(function->span(),
+                            "duplicate associated item '" + function->name +
+                                "'");
             }
         } else if (auto *constant =
                        dynamic_cast<const ast::ConstantItem *>(
@@ -45,8 +46,9 @@ void ImplCollector::collect(const ast::ImplItem &item) {
             symbol.constant = constant;
             symbol.implTarget = structId;
             if (!table_.declareAssoc(structId, constant->name, symbol)) {
-                diag_.error("duplicate associated item '" + constant->name +
-                            "'");
+                diag_.error(constant->span(),
+                            "duplicate associated item '" + constant->name +
+                                "'");
             }
         }
     }

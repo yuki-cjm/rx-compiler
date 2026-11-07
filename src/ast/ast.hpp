@@ -1,5 +1,7 @@
 #pragma once
 
+#include "span.hpp"
+
 #include <any>
 #include <cstddef>
 #include <memory>
@@ -79,6 +81,12 @@ class ASTNode {
   public:
     virtual ~ASTNode() = default;
     virtual std::any accept(ASTVisitor &visitor) = 0;
+
+    const Span &span() const { return span_; }
+    void setSpan(const Span &span) { span_ = span; }
+
+  private:
+    Span span_;
 };
 
 class Item : public ASTNode {};
@@ -99,6 +107,7 @@ struct Magnitude {
 
     Kind kind;
     std::string value;
+    Span span;
 };
 
 struct ConstValue {
@@ -113,6 +122,7 @@ struct ConstValue {
     std::string value;
     bool boolValue = false;
     Magnitude operand;
+    Span span;
 };
 
 struct PathSegment {
