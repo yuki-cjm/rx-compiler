@@ -1,4 +1,0 @@
-/home/yuki_cjm/compiler/rx-compiler/build/system-parser/CMakeFiles/rx-parse.dir
-/home/yuki_cjm/compiler/rx-compiler/build/system-parser/CMakeFiles/qualify-antlr-generated.dir
-/home/yuki_cjm/compiler/rx-compiler/build/system-parser/CMakeFiles/edit_cache.dir
-/home/yuki_cjm/compiler/rx-compiler/build/system-parser/CMakeFiles/rebuild_cache.dir
