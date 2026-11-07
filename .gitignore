@@ -1,6 +1,5 @@
 # Rust
 /target
-/build
 
 # REIMU build configuration
 /.xmake/

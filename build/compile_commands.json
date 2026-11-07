@@ -1,0 +1,230 @@
+[
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/main.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/main.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/main.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/ast/ast.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/ast/ast.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/ast/ast.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/ast/ast.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/ast/ast_builder.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/ast/ast_builder.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/ast/ast_builder.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/ast/ast_builder.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/ast/ast_printer.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/ast/ast_printer.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/ast/ast_printer.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/ast/ast_printer.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/semantic.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/semantic.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/semantic.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/semantic.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_box.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_box.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_box.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_box.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_scalar.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_scalar.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_scalar.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_scalar.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_traits.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_traits.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_traits.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_traits.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_vec.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_vec.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/builtin/builtin_vec.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/builtin/builtin_vec.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/assign.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/assign.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/assign.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/assign.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/calls.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/calls.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/calls.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/calls.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/coercion.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/coercion.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/coercion.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/coercion.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/integer_infer.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/integer_infer.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/integer_infer.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/integer_infer.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/main_check.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/main_check.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/main_check.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/main_check.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/operators.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/operators.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/operators.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/operators.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/place.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/place.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/place.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/place.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/check/typeck.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/check/typeck.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/check/typeck.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/check/typeck.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/collect/collector.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/collect/collector.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/collect/collector.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/collect/collector.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/collect/duplicate_check.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/collect/duplicate_check.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/collect/duplicate_check.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/collect/duplicate_check.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/collect/impl_collect.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/collect/impl_collect.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/collect/impl_collect.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/collect/impl_collect.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/consteval/const_eval.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/consteval/const_eval.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/consteval/const_eval.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/consteval/const_eval.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/diag/diagnostic.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/diag/diagnostic.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/diag/diagnostic.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/diag/diagnostic.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/resolve/layout_check.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/resolve/layout_check.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/resolve/layout_check.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/resolve/layout_check.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/resolve/path_resolve.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/resolve/path_resolve.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/resolve/path_resolve.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/resolve/path_resolve.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/resolve/resolver.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/resolve/resolver.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/resolve/resolver.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/resolve/resolver.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/symbol/namespace.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/symbol/namespace.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/symbol/namespace.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/symbol/namespace.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/symbol/scope.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/symbol/scope.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/symbol/scope.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/symbol/scope.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/symbol/symbol_table.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/symbol/symbol_table.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/symbol/symbol_table.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/symbol/symbol_table.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/type/type.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/type/type.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/type/type.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/type/type.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/type/type_compare.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/type/type_compare.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/type/type_compare.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/type/type_compare.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/src/semantic/type/type_print.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/src/semantic/type/type_print.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/src/semantic/type/type_print.cpp",
+  "output": "CMakeFiles/rx-parse.dir/src/semantic/type/type_print.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/generated/Lexer.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/generated/Lexer.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/generated/Lexer.cpp",
+  "output": "CMakeFiles/rx-parse.dir/generated/Lexer.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/generated/Parser.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/generated/Parser.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/generated/Parser.cpp",
+  "output": "CMakeFiles/rx-parse.dir/generated/Parser.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/generated/ParserBaseListener.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/generated/ParserBaseListener.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/generated/ParserBaseListener.cpp",
+  "output": "CMakeFiles/rx-parse.dir/generated/ParserBaseListener.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/generated/ParserBaseVisitor.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/generated/ParserBaseVisitor.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/generated/ParserBaseVisitor.cpp",
+  "output": "CMakeFiles/rx-parse.dir/generated/ParserBaseVisitor.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/generated/ParserListener.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/generated/ParserListener.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/generated/ParserListener.cpp",
+  "output": "CMakeFiles/rx-parse.dir/generated/ParserListener.cpp.o"
+},
+{
+  "directory": "/home/yuki_cjm/compiler/rx-compiler/build",
+  "command": "/usr/bin/c++  -I/home/yuki_cjm/compiler/rx-compiler/generated -isystem /usr/local/include/antlr4-runtime -g -std=c++17 -o CMakeFiles/rx-parse.dir/generated/ParserVisitor.cpp.o -c /home/yuki_cjm/compiler/rx-compiler/generated/ParserVisitor.cpp",
+  "file": "/home/yuki_cjm/compiler/rx-compiler/generated/ParserVisitor.cpp",
+  "output": "CMakeFiles/rx-parse.dir/generated/ParserVisitor.cpp.o"
+}
+]
