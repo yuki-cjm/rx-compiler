@@ -3,7 +3,7 @@
 # Optional: build your compiler once before testing. Leave empty if prebuilt.
 # {runtime} will be linked into every program.
 # Write shared runtime assembly there if your IR/CODEGEN output references it.
-BUILD = cmake --build build/parser --target rx-parse
+BUILD = cmake -S . -B build/parser && cmake --build build/parser --target rx-parse
 
 # Required for semantic tests: exit 0 to accept {source}, 1 to reject it.
 SEMANTIC = ./build/parser/rx-parse --semantic {source}
