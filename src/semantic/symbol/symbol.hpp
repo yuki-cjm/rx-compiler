@@ -3,7 +3,6 @@
 #include "../type/type.hpp"
 #include "../../ast/ast.hpp"
 
-#include <cstdint>
 #include <string>
 #include <vector>
 

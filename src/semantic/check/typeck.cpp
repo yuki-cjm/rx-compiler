@@ -440,7 +440,8 @@ std::any TypeChecker::visitCallExpr(ast::CallExpr *node) {
                 }
             }
             if (access != PlaceAccess::Mutable) {
-                diag_.error(node->span(), "method requires a mutable receiver");
+                diag_.error(fieldAccess->operand->span(),
+                            "method requires a mutable receiver");
             }
         }
         if (node->arguments.size() != signature->params.size()) {
@@ -483,7 +484,7 @@ std::any TypeChecker::visitIndexExpr(ast::IndexExpr *node) {
         }
     }
     if (current == nullptr || (!isArray(current) && !isVec(current))) {
-        diag_.error(node->span(), "value is not indexable");
+        diag_.error(node->operand->span(), "value is not indexable");
         return std::any(TypePtr(nullptr));
     }
     return std::any(current->inner);
@@ -494,7 +495,7 @@ std::any TypeChecker::visitFieldAccessExpr(ast::FieldAccessExpr *node) {
     StructId structId = 0;
     bool crossedShared = false;
     if (!PlaceRules::stripToStruct(baseType, &structId, &crossedShared)) {
-        diag_.error(node->span(), "field access requires a struct");
+        diag_.error(node->operand->span(), "field access requires a struct");
         return std::any(TypePtr(nullptr));
     }
     const FieldInfo *field =
@@ -514,14 +515,14 @@ std::any TypeChecker::visitUnaryExpr(ast::UnaryExpr *node) {
         node->op == ast::UnaryOp::DoubleBorrowMut) {
         auto place = classifyPlace(*node->operand);
         if (place && place->access != PlaceAccess::Mutable) {
-            diag_.error(node->span(),
+            diag_.error(node->operand->span(),
                         "cannot mutably borrow an immutable place");
         }
     }
 
     auto result = Operators::unaryResult(node->op, operand);
     if (!result) {
-        diag_.error(node->span(), "invalid operand for unary operator");
+        diag_.error(node->operand->span(), "invalid operand for unary operator");
         return std::any(TypePtr(nullptr));
     }
     return std::any(*result);
@@ -537,7 +538,7 @@ std::any TypeChecker::visitCastExpr(ast::CastExpr *node) {
     bool valid = (isInteger(operand) && isInteger(target)) ||
                  (isBool(operand) && isInteger(target));
     if (!valid) {
-        diag_.error(node->span(), "unsupported cast");
+        diag_.error(node->operand->span(), "unsupported cast");
     }
     return std::any(target);
 }
@@ -547,7 +548,7 @@ std::any TypeChecker::visitBinaryExpr(ast::BinaryExpr *node) {
         TypePtr leftType = checkExpr(*node->left, std::nullopt);
         auto place = classifyPlace(*node->left);
         if (!place) {
-            diag_.error(node->span(), "assignment target is not a place");
+            diag_.error(node->left->span(), "assignment target is not a place");
             return std::any(Type::makeUnit());
         }
         PlaceInfo target{place->type, place->access == PlaceAccess::Mutable};
@@ -561,7 +562,7 @@ std::any TypeChecker::visitBinaryExpr(ast::BinaryExpr *node) {
         TypePtr leftType = checkExpr(*node->left, std::nullopt);
         auto place = classifyPlace(*node->left);
         if (!place) {
-            diag_.error(node->span(),
+            diag_.error(node->left->span(),
                         "compound assignment target is not a place");
             return std::any(Type::makeUnit());
         }
@@ -576,13 +577,14 @@ std::any TypeChecker::visitBinaryExpr(ast::BinaryExpr *node) {
     TypePtr rightType = checkExpr(*node->right, std::nullopt);
     auto result = Operators::binaryResult(node->op, leftType, rightType);
     if (!result) {
-        diag_.error(node->span(), "invalid operands for binary operator");
+        diag_.error(node->right->span(),
+                    "invalid operands for binary operator");
         return std::any(Type::makeNever());
     }
     if (node->op == ast::BinaryOp::Equal ||
         node->op == ast::BinaryOp::NotEqual) {
         if (!supportsPartialEq(table_, leftType)) {
-            diag_.error(node->span(), "equality requires PartialEq");
+            diag_.error(node->left->span(), "equality requires PartialEq");
         }
     }
     return std::any(*result);
@@ -650,6 +652,11 @@ std::any TypeChecker::visitBlockExpr(ast::BlockExpr *node) {
     TypePtr result;
     if (node->tail != nullptr) {
         result = checkExpr(*node->tail, expected_);
+        // 尾表达式已经按 expected_ 检查（含 coercion），块的结果类型就是 expected_，
+        // 避免外层 checkExpr 对同一个 expected_ 重复做 coercion 并二次报错。
+        if (expected_) {
+            result = *expected_;
+        }
     } else {
         result = blockDiverges ? Type::makeNever() : Type::makeUnit();
     }
@@ -767,19 +774,19 @@ std::any TypeChecker::visitBreakExpr(ast::BreakExpr *node) {
 }
 
 std::any TypeChecker::visitReturnExpr(ast::ReturnExpr *node) {
-    TypePtr valueType;
     if (node->value != nullptr) {
-        valueType =
-            checkExpr(*node->value,
-                      currentReturn_ ? std::optional<TypePtr>(*currentReturn_)
-                                     : std::nullopt);
+        // 返回值已按返回类型检查（含 coercion），失败时 checkExpr 已报错，无需二次检查。
+        checkExpr(*node->value,
+                  currentReturn_ ? std::optional<TypePtr>(*currentReturn_)
+                                 : std::nullopt);
     } else {
-        valueType = Type::makeUnit();
-    }
-    if (currentReturn_ && !isNever(valueType) &&
-        !Coercion::canCoerce(table_, valueType, *currentReturn_)) {
-        diag_.error(node->span(),
-                    "return value does not match the function return type");
+        // 裸 return; 提供 ()，需要单独检查是否匹配返回类型。
+        TypePtr valueType = Type::makeUnit();
+        if (currentReturn_ &&
+            !Coercion::canCoerce(table_, valueType, *currentReturn_)) {
+            diag_.error(node->span(),
+                        "return value does not match the function return type");
+        }
     }
     return std::any(Type::makeNever());
 }

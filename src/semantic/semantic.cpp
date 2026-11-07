@@ -13,8 +13,6 @@
 namespace rx::semantic {
 
 namespace {
-
-// 解析结构体字段类型，写回符号表。
 void resolveStructFields(const ast::Program &program, SymbolTable &table,
                          Diagnostic &diag) {
     TypeResolver resolver(table, diag);
@@ -39,7 +37,6 @@ void resolveStructFields(const ast::Program &program, SymbolTable &table,
     }
 }
 
-// 校验 struct 的 derive 需求。
 void checkDerives(const ast::Program &program, SymbolTable &table,
                   Diagnostic &diag) {
     for (const ast::ItemPtr &item : program.items) {
@@ -64,27 +61,31 @@ void checkDerives(const ast::Program &program, SymbolTable &table,
         }
         for (const FieldInfo &field : symbol->fields) {
             if (deriveCopy && !isCopy(table, field.type)) {
-                diag.error(structure->span(), "Copy requires every field to be Copy");
+                diag.error(structure->span(),
+                           "Copy requires every field to be Copy");
             }
             if (deriveClone && !isClone(table, field.type)) {
-                diag.error(structure->span(), "Clone requires every field to be Clone");
+                diag.error(structure->span(),
+                           "Clone requires every field to be Clone");
             }
             if (derivePartialEq && !supportsPartialEq(table, field.type)) {
-                diag.error(structure->span(), "PartialEq requires every field to be PartialEq");
+                diag.error(structure->span(),
+                           "PartialEq requires every field to be PartialEq");
             }
             if (deriveEq && !supportsEq(table, field.type)) {
-                diag.error(structure->span(), "Eq requires every field to be Eq");
+                diag.error(structure->span(),
+                           "Eq requires every field to be Eq");
             }
         }
     }
 }
 
-// 求值全部常量（含环检测），并顺带检查未使用的常量。
 void checkConstants(const ast::Program &program, SymbolTable &table,
                     Diagnostic &diag) {
     TypeResolver resolver(table, diag);
     for (const ast::ItemPtr &item : program.items) {
-        if (auto *constant = dynamic_cast<const ast::ConstantItem *>(item.get())) {
+        if (auto *constant =
+                dynamic_cast<const ast::ConstantItem *>(item.get())) {
             const Symbol *symbol = table.lookupGlobalValue(constant->name);
             if (symbol == nullptr) {
                 continue;
@@ -95,11 +96,13 @@ void checkConstants(const ast::Program &program, SymbolTable &table,
             }
         } else if (auto *implementation =
                        dynamic_cast<const ast::ImplItem *>(item.get())) {
-            TypePtr target = resolver.resolve(*implementation->typeName, nullptr);
+            TypePtr target =
+                resolver.resolve(*implementation->typeName, nullptr);
             if (target == nullptr || !isStruct(target)) {
                 continue;
             }
-            for (const ast::ItemPtr &associated : implementation->associatedItems) {
+            for (const ast::ItemPtr &associated :
+                 implementation->associatedItems) {
                 auto *constant =
                     dynamic_cast<const ast::ConstantItem *>(associated.get());
                 if (constant == nullptr) {

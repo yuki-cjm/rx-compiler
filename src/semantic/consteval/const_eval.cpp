@@ -198,7 +198,8 @@ std::optional<EvaluatedConst> matchExpected(Diagnostic &diag, const Span &span,
                                             EvaluatedConst result,
                                             const TypePtr &expectedType) {
     if (expectedType != nullptr && !sameType(result.type, expectedType)) {
-        diag.error(span, "constant initializer does not match its declared type");
+        diag.error(span,
+                   "constant initializer does not match its declared type");
         return std::nullopt;
     }
     return result;
@@ -212,83 +213,85 @@ std::optional<EvaluatedConst> evaluateConst(SymbolTable &table,
                                             const TypePtr &expectedType,
                                             const TypePtr &selfType) {
     switch (value.kind) {
-    case ast::ConstValue::Kind::Integer: {
-        auto parsed = parseInteger(value.value, expectedType);
-        if (!parsed) {
-            diag.error(value.span, "invalid integer literal '" + value.value + "'");
-            return std::nullopt;
-        }
-        EvaluatedConst result;
-        result.type = parsed->type;
-        result.intValue = parsed->value;
-        return matchExpected(diag, value.span, std::move(result), expectedType);
-    }
-    case ast::ConstValue::Kind::Boolean: {
-        if (expectedType != nullptr && !isBool(expectedType)) {
-            diag.error(value.span,
-                       "constant initializer does not match its declared type");
-            return std::nullopt;
-        }
-        EvaluatedConst result;
-        result.type = Type::makeScalar(TypeKind::Bool);
-        result.boolValue = value.boolValue;
-        return result;
-    }
-    case ast::ConstValue::Kind::Path: {
-        const Symbol *symbol =
-            resolveConstPath(table, diag, value.value, selfType);
-        if (symbol == nullptr) {
-            return std::nullopt;
-        }
-        auto result = evaluateSymbol(table, diag, symbol);
-        if (!result) {
-            return std::nullopt;
-        }
-        return matchExpected(diag, value.span, std::move(*result), expectedType);
-    }
-    case ast::ConstValue::Kind::Negate: {
-        const ast::Magnitude &magnitude = value.operand;
-
-        std::optional<EvaluatedConst> operand;
-        if (magnitude.kind == ast::Magnitude::Kind::Integer) {
-            auto parsed = parseInteger(magnitude.value, std::nullopt);
+        case ast::ConstValue::Kind::Integer: {
+            auto parsed = parseInteger(value.value, expectedType);
             if (!parsed) {
                 diag.error(value.span,
-                           "invalid integer literal '" + magnitude.value + "'");
+                           "invalid integer literal '" + value.value + "'");
                 return std::nullopt;
             }
-            if (!isSignedInteger(parsed->type)) {
-                diag.error(value.span, "unsigned constant negation is invalid");
+            EvaluatedConst result;
+            result.type = parsed->type;
+            result.intValue = parsed->value;
+            return matchExpected(diag, value.span, std::move(result), expectedType);
+        }   
+        case ast::ConstValue::Kind::Boolean: {
+            if (expectedType != nullptr && !isBool(expectedType)) {
+                diag.error(value.span,
+                           "constant initializer does not match its declared type");
                 return std::nullopt;
             }
-            EvaluatedConst parsedValue;
-            parsedValue.type = parsed->type;
-            parsedValue.intValue = parsed->value;
-            operand = std::move(parsedValue);
-        } else {
+            EvaluatedConst result;
+            result.type = Type::makeScalar(TypeKind::Bool);
+            result.boolValue = value.boolValue;
+            return result;
+        }
+        case ast::ConstValue::Kind::Path: {
             const Symbol *symbol =
-                resolveConstPath(table, diag, magnitude.value, selfType);
+                resolveConstPath(table, diag, value.value, selfType);
             if (symbol == nullptr) {
                 return std::nullopt;
             }
-            operand = evaluateSymbol(table, diag, symbol);
+            auto result = evaluateSymbol(table, diag, symbol);
+            if (!result) {
+                return std::nullopt;
+            }
+            return matchExpected(diag, value.span, std::move(*result),
+                                 expectedType);
         }
+        case ast::ConstValue::Kind::Negate: {
+            const ast::Magnitude &magnitude = value.operand;
 
-        if (!operand) {
-            return std::nullopt;
-        }
-        if (!isSignedInteger(operand->type)) {
-            diag.error(value.span, "unsigned constant negation is invalid");
-            return std::nullopt;
-        }
+            std::optional<EvaluatedConst> operand;
+            if (magnitude.kind == ast::Magnitude::Kind::Integer) {
+                auto parsed = parseInteger(magnitude.value, std::nullopt);
+                if (!parsed) {
+                    diag.error(value.span,
+                               "invalid integer literal '" + magnitude.value + "'");
+                    return std::nullopt;
+                }
+                if (!isSignedInteger(parsed->type)) {
+                    diag.error(value.span, "unsigned constant negation is invalid");
+                    return std::nullopt;
+                }
+                EvaluatedConst parsedValue;
+                parsedValue.type = parsed->type;
+                parsedValue.intValue = parsed->value;
+                operand = std::move(parsedValue);
+            } else {
+                const Symbol *symbol =
+                    resolveConstPath(table, diag, magnitude.value, selfType);
+                if (symbol == nullptr) {
+                    return std::nullopt;
+                }
+                operand = evaluateSymbol(table, diag, symbol);
+            }
 
-        std::uint32_t negated = static_cast<std::uint32_t>(
-            0 - static_cast<std::uint32_t>(operand->intValue));
-        EvaluatedConst result;
-        result.type = operand->type;
-        result.intValue = negated;
-        return matchExpected(diag, value.span, std::move(result), expectedType);
-    }
+            if (!operand) {
+                return std::nullopt;
+            }
+            if (!isSignedInteger(operand->type)) {
+                diag.error(value.span, "unsigned constant negation is invalid");
+                return std::nullopt;
+            }
+
+            std::uint32_t negated = static_cast<std::uint32_t>(
+                0 - static_cast<std::uint32_t>(operand->intValue));
+            EvaluatedConst result;
+            result.type = operand->type;
+            result.intValue = negated;
+            return matchExpected(diag, value.span, std::move(result), expectedType);
+        }
     }
     return std::nullopt;
 }
